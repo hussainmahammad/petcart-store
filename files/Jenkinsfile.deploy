@@ -18,7 +18,12 @@ pipeline {
         sh '''
           echo "Building frontend (Vite)..."
           cd app
+
           npm install
+
+          # Fix permission issue for vite binary (required on Jenkins EC2)
+          chmod +x node_modules/.bin/vite
+
           npm run build
         '''
       }
