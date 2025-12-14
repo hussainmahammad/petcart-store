@@ -1,0 +1,80 @@
+pipeline {
+  agent { label 'agent-b' }
+
+  environment {
+    AWS_REGION = 'us-east-1'
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build Vite App') {
+      steps {
+        sh '''
+          echo "Building frontend (Vite)..."
+          cd app
+          npm install
+          npm run build
+        '''
+      }
+    }
+
+    stage('Terraform Apply') {
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            echo "Creating infrastructure in Account C..."
+            cd files/terraform
+            terraform init
+            terraform apply -auto-approve
+          '''
+        }
+      }
+    }
+
+    stage('Get EC2 IP') {
+      steps {
+        script {
+          env.EC2_IP = sh(
+            script: "cd files/terraform && terraform output -raw public_ip",
+            returnStdout: true
+          ).trim()
+          echo "EC2 Public IP: ${EC2_IP}"
+        }
+      }
+    }
+
+    stage('Deploy App with Ansible') {
+      steps {
+        sh '''
+          echo "Deploying app using Ansible..."
+          cd files/ansible
+          envsubst < inventory.tpl > inventory.ini
+          ansible-playbook -i inventory.ini deploy.yml
+        '''
+      }
+    }
+
+    stage('Done') {
+      steps {
+        echo "✅ Deployment completed successfully"
+        echo "🌍 Application URL: http://${EC2_IP}"
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "🧹 Cleaning Jenkins workspace"
+      cleanWs()
+    }
+  }
+}

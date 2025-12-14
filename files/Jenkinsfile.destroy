@@ -1,0 +1,45 @@
+pipeline {
+  agent { label 'agent-b' }
+
+  environment {
+    AWS_REGION = 'us-east-1'
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Terraform Destroy') {
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            echo "Destroying infrastructure in Account C..."
+            cd files/terraform
+            terraform init
+            terraform destroy -auto-approve
+          '''
+        }
+      }
+    }
+
+    stage('Done') {
+      steps {
+        echo "🧹 Infrastructure destroyed successfully"
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "🧹 Cleaning Jenkins workspace"
+      cleanWs()
+    }
+  }
+}

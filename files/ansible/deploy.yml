@@ -1,15 +1,33 @@
-
 ---
-- name: Deploy PetCart Store app
-  hosts: petcart_servers
-  become: true
+- name: Deploy PetCart frontend
+  hosts: web
+  become: yes
+
   tasks:
-    - name: Ensure Node.js is installed
-      ansible.builtin.package:
-        name: nodejs
+    - name: Install nginx
+      yum:
+        name: nginx
         state: present
 
-    - name: Copy backend files
-      ansible.builtin.copy:
-        src: ../../app/backend/
-        dest: /opt/petcart-store/backend/
+    - name: Enable and start nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Remove default nginx html directory
+      file:
+        path: /usr/share/nginx/html
+        state: absent
+
+    - name: Create nginx html directory
+      file:
+        path: /usr/share/nginx/html
+        state: directory
+        mode: '0755'
+
+    - name: Copy Vite build files
+      copy:
+        src: ../../app/dist/
+        dest: /usr/share/nginx/html/
+        mode: '0644'
