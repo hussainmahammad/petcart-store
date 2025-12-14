@@ -42,12 +42,17 @@ pipeline {
 
     stage('Get EC2 IP') {
       steps {
-        script {
-          env.EC2_IP = sh(
-            script: "cd files/terraform && terraform output -raw public_ip",
-            returnStdout: true
-          ).trim()
-          echo "EC2 IP: ${EC2_IP}"
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          script {
+            env.EC2_IP = sh(
+              script: "cd files/terraform && terraform output -raw public_ip",
+              returnStdout: true
+            ).trim()
+            echo "EC2 IP: ${EC2_IP}"
+          }
         }
       }
     }
