@@ -1,0 +1,1 @@
+export default function FAQCard(){ return <div className='card p-4'>FAQ Category</div> }

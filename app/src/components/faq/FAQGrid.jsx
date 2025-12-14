@@ -1,0 +1,1 @@
+export default function FAQGrid(){ return <div className='mx-auto max-w-7xl px-4 my-6 grid grid-cols-2 md:grid-cols-3 gap-4'><div className='card h-24'/><div className='card h-24'/><div className='card h-24'/></div> }

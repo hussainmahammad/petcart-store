@@ -1,0 +1,89 @@
+{
+  "siteName": "PetCart.Shop",
+  "logo": "/site/logo/logo.png",
+  "banners": {
+    "hero": {
+      "image": "/site/banners/hero-banner.jpg",
+      "heading": "Welcome to PetCart.Shop",
+      "subHeading": "All in one place for your furry, feathered & finned pets."
+    },
+    "signupOffer": {
+      "image": "/site/banners/signup-offer.jpg"
+    },
+    "offerBanners": [
+      "/site/offer-banners/offer-2.jpg.PNG",
+      "/site/offer-banners/offer-3.jpg.PNG",
+      "/site/offer-banners/offer-4.jpg.PNG",
+      "/site/offer-banners/offer-5.jpg.PNG",
+      "/site/offer-banners/offer-6.jpg.PNG"
+    ]
+  },
+  "showcaseCategories": [
+    {
+      "name": "Food",
+      "image": "/site/showcase-categories/food.jpg"
+    },
+    {
+      "name": "Homes & Beds",
+      "image": "/site/showcase-categories/homes-beds.jpg"
+    },
+    {
+      "name": "Toys & Entertainment",
+      "image": "/site/showcase-categories/toys-entertainment.jpg"
+    },
+    {
+      "name": "Health & Medicine",
+      "image": "/site/showcase-categories/health-medicine.jpg"
+    },
+    {
+      "name": "Accessories",
+      "image": "/site/showcase-categories/accessories.jpg"
+    },
+    {
+      "name": "Grooming",
+      "image": "/site/showcase-categories/grooming.jpg"
+    }
+  ],
+  "defaults": {
+    "noImage": "/site/defaults/no-image.jpg",
+    "noBanner": "/site/defaults/no-banner.jpg",
+    "noCategory": "/site/defaults/no-category.jpg"
+  },
+  "socialLinks": {
+    "facebook": "https://www.facebook.com/AkhilAkkineni",
+    "instagram": "https://www.instagram.com/akkineniakhil?igsh=MW5leG92cmFhOHRzYQ==",
+    "twitter": "https://x.com/akhilakkineni8?lang=en",
+    "youtube": "https://m.youtube.com/@akhilakkineni2915"
+  },
+  "footer": {
+    "about": {
+      "ourStory": "/our-story",
+      "queryForm": "/query-form",
+      "contactEmail": "connect@petcart.shop",
+      "contactPhone": "1234567890"
+    },
+    "help": {
+      "supportPage": "/support",
+      "faq": "/faq",
+      "supportEmail": "support@petcart.shop",
+      "supportPhone": "1234567890"
+    }
+  },
+  "shop": {
+    "warehouse": {
+      "pincode": "560100",
+      "coordinates": [77.6545, 12.8498],
+      "address": "PetCart Main Warehouse, Bangalore, India"
+    },
+    "deliveryBuckets": [
+      { "maxKm": 50, "days": "1–2 days" },
+      { "maxKm": 100, "days": "1–3 days" },
+      { "maxKm": 250, "days": "2–4 days" },
+      { "maxKm": 400, "days": "3–5 days" },
+      { "maxKm": 600, "days": "4–7 days" },
+      { "maxKm": 900, "days": "5–9 days" },
+      { "maxKm": 1200, "days": "7–12 days" },
+      { "maxKm": null, "days": "10–14 days" }
+    ]
+  }
+}

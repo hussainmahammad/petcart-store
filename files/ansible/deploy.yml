@@ -1,0 +1,15 @@
+
+---
+- name: Deploy PetCart Store app
+  hosts: petcart_servers
+  become: true
+  tasks:
+    - name: Ensure Node.js is installed
+      ansible.builtin.package:
+        name: nodejs
+        state: present
+
+    - name: Copy backend files
+      ansible.builtin.copy:
+        src: ../../app/backend/
+        dest: /opt/petcart-store/backend/
