@@ -24,7 +24,7 @@ resource "aws_security_group" "petcart_sg" {
 }
 
 resource "aws_instance" "petcart" {
-  ami                    = "ami-0e001c9271cf7f3b9" # Amazon Linux 2023 us-east-1
+  ami                    = "ami-068c0051b15cdb816" # Amazon Linux 2023 us-east-1
   instance_type          = "t3.micro"
   key_name               = "hussaincloud"
   vpc_security_group_ids = [aws_security_group.petcart_sg.id]
