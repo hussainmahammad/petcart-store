@@ -46,6 +46,8 @@ pipeline {
     /* ================= DEPLOY ================= */
     stage('Deploy') {
       steps {
+
+        /* ---- Get EC2 IP ---- */
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
@@ -59,6 +61,19 @@ pipeline {
           }
         }
 
+        /* ---- Wait for SSH (REQUIRED) ---- */
+        sh '''
+          echo "Waiting for SSH on ${EC2_IP}..."
+          for i in {1..30}; do
+            ssh -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                ec2-user@${EC2_IP} "echo SSH ready" && break
+            echo "SSH not ready yet... waiting"
+            sleep 10
+          done
+        '''
+
+        /* ---- Ansible Deploy ---- */
         sh '''
           cd files/ansible
           envsubst < inventory.tpl > inventory.ini
