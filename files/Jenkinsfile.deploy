@@ -7,7 +7,7 @@ pipeline {
 
   stages {
 
-    /* ---------------- PREPARE ---------------- */
+    /* ================= PREPARE ================= */
     stage('Prepare') {
       steps {
         echo 'Prepare phase'
@@ -15,7 +15,7 @@ pipeline {
       }
     }
 
-    /* ---------------- BUILD ---------------- */
+    /* ================= BUILD ================= */
     stage('Build') {
       steps {
         echo 'Build phase'
@@ -29,7 +29,7 @@ pipeline {
       }
     }
 
-    /* ---------------- SETUP ---------------- */
+    /* ================= SETUP ================= */
     stage('Setup') {
       steps {
         echo 'Setup phase'
@@ -45,15 +45,16 @@ pipeline {
       }
     }
 
-    /* ---------------- DEPLOY ---------------- */
+    /* ================= DEPLOY ================= */
     stage('Deploy') {
       steps {
         echo 'Deploy phase'
+
+        /* ---- Terraform apply + output (credentials REQUIRED) ---- */
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
-
           sh '''
             cd files/terraform
             terraform apply -auto-approve
@@ -68,6 +69,19 @@ pipeline {
           }
         }
 
+        /* ---- Wait for SSH to be ready ---- */
+        sh '''
+          echo "Waiting for SSH on ${EC2_IP}..."
+          for i in {1..30}; do
+            nc -z ${EC2_IP} 22 && echo "SSH is ready" && exit 0
+            echo "SSH not ready yet... waiting"
+            sleep 10
+          done
+          echo "ERROR: SSH did not become ready"
+          exit 1
+        '''
+
+        /* ---- Ansible deploy ---- */
         sh '''
           cd files/ansible
           envsubst < inventory.tpl > inventory.ini
@@ -76,7 +90,7 @@ pipeline {
       }
     }
 
-    /* ---------------- VALIDATE ---------------- */
+    /* ================= VALIDATE ================= */
     stage('Validate') {
       steps {
         echo 'Validate phase'
@@ -87,7 +101,7 @@ pipeline {
       }
     }
 
-    /* ---------------- COMPLETE ---------------- */
+    /* ================= COMPLETE ================= */
     stage('Complete') {
       steps {
         echo 'Complete phase'
