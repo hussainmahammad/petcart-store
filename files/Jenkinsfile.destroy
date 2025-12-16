@@ -7,14 +7,24 @@ pipeline {
 
   stages {
 
-    stage('Checkout') {
+    /* ---------------- COMPLETE ---------------- */
+    stage('Complete') {
       steps {
-        checkout scm
+        echo 'Starting destroy process'
       }
     }
 
-    stage('Terraform Destroy') {
+    /* ---------------- VALIDATE ---------------- */
+    stage('Validate') {
       steps {
+        echo 'Validate phase (pre-destroy checks)'
+      }
+    }
+
+    /* ---------------- DEPLOY (DESTROY LOGIC) ---------------- */
+    stage('Deploy') {
+      steps {
+        echo 'Destroy phase (Terraform destroy)'
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
@@ -29,9 +39,25 @@ pipeline {
       }
     }
 
-    stage('Done') {
+    /* ---------------- SETUP ---------------- */
+    stage('Setup') {
       steps {
-        echo "🧹 Infrastructure destroyed successfully"
+        echo 'Cleanup configuration & state'
+      }
+    }
+
+    /* ---------------- BUILD ---------------- */
+    stage('Build') {
+      steps {
+        echo 'Build cleanup (nothing to build during destroy)'
+      }
+    }
+
+    /* ---------------- PREPARE ---------------- */
+    stage('Prepare') {
+      steps {
+        echo 'Prepare cleanup'
+        checkout scm
       }
     }
   }
