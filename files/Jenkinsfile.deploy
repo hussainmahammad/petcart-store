@@ -7,14 +7,18 @@ pipeline {
 
   stages {
 
-    stage('Checkout') {
+    /* ---------------- PREPARE ---------------- */
+    stage('Prepare') {
       steps {
+        echo 'Prepare phase'
         checkout scm
       }
     }
 
-    stage('Build Vite App') {
+    /* ---------------- BUILD ---------------- */
+    stage('Build') {
       steps {
+        echo 'Build phase'
         sh '''
           echo "Building frontend (Vite)..."
           cd app
@@ -25,8 +29,10 @@ pipeline {
       }
     }
 
-    stage('Terraform Apply') {
+    /* ---------------- SETUP ---------------- */
+    stage('Setup') {
       steps {
+        echo 'Setup phase'
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
@@ -34,31 +40,33 @@ pipeline {
           sh '''
             cd files/terraform
             terraform init
-            terraform apply -auto-approve
           '''
         }
       }
     }
 
-    stage('Get EC2 IP') {
+    /* ---------------- DEPLOY ---------------- */
+    stage('Deploy') {
       steps {
+        echo 'Deploy phase'
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
-          script {
-            env.EC2_IP = sh(
-              script: "cd files/terraform && terraform output -raw public_ip",
-              returnStdout: true
-            ).trim()
-            echo "EC2 IP: ${EC2_IP}"
-          }
+          sh '''
+            cd files/terraform
+            terraform apply -auto-approve
+          '''
         }
-      }
-    }
 
-    stage('Deploy App with Ansible') {
-      steps {
+        script {
+          env.EC2_IP = sh(
+            script: "cd files/terraform && terraform output -raw public_ip",
+            returnStdout: true
+          ).trim()
+          echo "EC2 IP: ${EC2_IP}"
+        }
+
         sh '''
           cd files/ansible
           envsubst < inventory.tpl > inventory.ini
@@ -67,8 +75,21 @@ pipeline {
       }
     }
 
-    stage('Done') {
+    /* ---------------- VALIDATE ---------------- */
+    stage('Validate') {
       steps {
+        echo 'Validate phase'
+        sh '''
+          echo "Basic validation placeholder"
+          echo "EC2 reachable at http://${EC2_IP}"
+        '''
+      }
+    }
+
+    /* ---------------- COMPLETE ---------------- */
+    stage('Complete') {
+      steps {
+        echo 'Complete phase'
         echo "✅ App deployed successfully"
         echo "🌍 Application URL: http://${EC2_IP}"
       }
