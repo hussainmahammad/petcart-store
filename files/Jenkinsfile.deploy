@@ -53,18 +53,19 @@ pipeline {
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
+
           sh '''
             cd files/terraform
             terraform apply -auto-approve
           '''
-        }
 
-        script {
-          env.EC2_IP = sh(
-            script: "cd files/terraform && terraform output -raw public_ip",
-            returnStdout: true
-          ).trim()
-          echo "EC2 IP: ${EC2_IP}"
+          script {
+            env.EC2_IP = sh(
+              script: "cd files/terraform && terraform output -raw public_ip",
+              returnStdout: true
+            ).trim()
+            echo "EC2 IP: ${EC2_IP}"
+          }
         }
 
         sh '''
@@ -80,8 +81,8 @@ pipeline {
       steps {
         echo 'Validate phase'
         sh '''
-          echo "Basic validation placeholder"
-          echo "EC2 reachable at http://${EC2_IP}"
+          echo "Application should be reachable at:"
+          echo "http://${EC2_IP}"
         '''
       }
     }
