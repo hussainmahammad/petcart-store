@@ -61,11 +61,12 @@ pipeline {
           }
         }
 
-        /* ---- Wait for SSH (REQUIRED) ---- */
+        /* ---- Wait for SSH (FIXED & CORRECT) ---- */
         sh '''
           echo "Waiting for SSH on ${EC2_IP}..."
           for i in {1..30}; do
-            ssh -o StrictHostKeyChecking=no \
+            ssh -i /home/jenkins/.ssh/hussaincloud \
+                -o StrictHostKeyChecking=no \
                 -o ConnectTimeout=5 \
                 ec2-user@${EC2_IP} "echo SSH ready" && break
             echo "SSH not ready yet... waiting"
