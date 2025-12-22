@@ -7,27 +7,22 @@ pipeline {
 
   stages {
 
-    /* ================= PREPARE ================= */
     stage('Prepare') {
       steps {
         checkout scm
       }
     }
 
-    /* ================= BUILD ================= */
     stage('Build') {
       steps {
         sh '''
-          echo "Building frontend (Vite)..."
           cd app
           npm install
-          chmod +x node_modules/.bin/vite
           npm run build
         '''
       }
     }
 
-    /* ================= SETUP ================= */
     stage('Setup') {
       steps {
         withCredentials([
@@ -43,38 +38,29 @@ pipeline {
       }
     }
 
-    /* ================= DEPLOY ================= */
     stage('Deploy') {
       steps {
-
-        /* ---- Get EC2 IP ---- */
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
           script {
-            env.EC2_IP = sh(
-              script: "cd files/terraform && terraform output -raw public_ip",
-              returnStdout: true
-            ).trim()
-            echo "EC2 IP: ${EC2_IP}"
+            env.EC2_IP = sh(script: "cd files/terraform && terraform output -raw public_ip", returnStdout: true).trim()
+            env.INSTANCE_ID = sh(script: "cd files/terraform && terraform output -raw instance_id", returnStdout: true).trim()
+            env.NGINX_ACCESS_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_access_log_group", returnStdout: true).trim()
+            env.NGINX_ERROR_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_error_log_group", returnStdout: true).trim()
           }
         }
 
-        /* ---- Wait for SSH (FIXED & CORRECT) ---- */
         sh '''
-          echo "Waiting for SSH on ${EC2_IP}..."
           for i in {1..30}; do
             ssh -i /home/jenkins/.ssh/hussaincloud \
                 -o StrictHostKeyChecking=no \
-                -o ConnectTimeout=5 \
-                ec2-user@${EC2_IP} "echo SSH ready" && break
-            echo "SSH not ready yet... waiting"
+                ec2-user@${EC2_IP} "echo ready" && break
             sleep 10
           done
         '''
 
-        /* ---- Ansible Deploy ---- */
         sh '''
           cd files/ansible
           envsubst < inventory.tpl > inventory.ini
@@ -83,18 +69,12 @@ pipeline {
       }
     }
 
-    /* ================= VALIDATE ================= */
-    stage('Validate') {
-      steps {
-        echo "Application reachable at http://${EC2_IP}"
-      }
-    }
-
-    /* ================= COMPLETE ================= */
     stage('Complete') {
       steps {
-        echo "✅ App deployed successfully"
-        echo "🌍 Application URL: http://${EC2_IP}"
+        echo "URL: http://${EC2_IP}"
+        echo "INSTANCE_ID=${INSTANCE_ID}"
+        echo "ACCESS_LOG_GROUP=${NGINX_ACCESS_LOG_GROUP}"
+        echo "ERROR_LOG_GROUP=${NGINX_ERROR_LOG_GROUP}"
       }
     }
   }
