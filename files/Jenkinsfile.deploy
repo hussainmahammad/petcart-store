@@ -47,36 +47,16 @@ pipeline {
     stage('Deploy') {
       steps {
 
-        /* ---- Get Terraform Outputs ---- */
+        /* ---- Terraform Outputs ---- */
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
           script {
-            env.EC2_IP = sh(
-              script: "cd files/terraform && terraform output -raw public_ip",
-              returnStdout: true
-            ).trim()
-
-            env.INSTANCE_ID = sh(
-              script: "cd files/terraform && terraform output -raw instance_id",
-              returnStdout: true
-            ).trim()
-
-            env.NGINX_ACCESS_LOG_GROUP = sh(
-              script: "cd files/terraform && terraform output -raw nginx_access_log_group",
-              returnStdout: true
-            ).trim()
-
-            env.NGINX_ERROR_LOG_GROUP = sh(
-              script: "cd files/terraform && terraform output -raw nginx_error_log_group",
-              returnStdout: true
-            ).trim()
-
-            echo "EC2 IP: ${EC2_IP}"
-            echo "Instance ID: ${INSTANCE_ID}"
-            echo "Access Log Group: ${NGINX_ACCESS_LOG_GROUP}"
-            echo "Error Log Group: ${NGINX_ERROR_LOG_GROUP}"
+            env.EC2_IP = sh(script: "cd files/terraform && terraform output -raw public_ip", returnStdout: true).trim()
+            env.INSTANCE_ID = sh(script: "cd files/terraform && terraform output -raw instance_id", returnStdout: true).trim()
+            env.NGINX_ACCESS_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_access_log_group", returnStdout: true).trim()
+            env.NGINX_ERROR_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_error_log_group", returnStdout: true).trim()
           }
         }
 
@@ -88,36 +68,32 @@ pipeline {
                 -o StrictHostKeyChecking=no \
                 -o ConnectTimeout=5 \
                 ec2-user@${EC2_IP} "echo SSH ready" && break
-            echo "SSH not ready yet... waiting"
             sleep 10
           done
         '''
 
-        /* ---- Ansible Deploy ---- */
+        /* ---- Ansible Deploy (FIXED) ---- */
         sh '''
           cd files/ansible
+
+          echo "Generating inventory.ini..."
           envsubst < inventory.tpl > inventory.ini
+
+          echo "Inventory file:"
+          cat inventory.ini
+
           ansible-playbook -i inventory.ini deploy.yml
         '''
-      }
-    }
-
-    /* ================= VALIDATE ================= */
-    stage('Validate') {
-      steps {
-        echo "Application reachable at http://${EC2_IP}"
       }
     }
 
     /* ================= COMPLETE ================= */
     stage('Complete') {
       steps {
-        echo "✅ App deployed successfully"
-        echo "🌍 Application URL: http://${EC2_IP}"
-        echo "📦 Deployment Metadata"
+        echo "URL: http://${EC2_IP}"
         echo "INSTANCE_ID=${INSTANCE_ID}"
-        echo "NGINX_ACCESS_LOG_GROUP=${NGINX_ACCESS_LOG_GROUP}"
-        echo "NGINX_ERROR_LOG_GROUP=${NGINX_ERROR_LOG_GROUP}"
+        echo "ACCESS_LOG_GROUP=${NGINX_ACCESS_LOG_GROUP}"
+        echo "ERROR_LOG_GROUP=${NGINX_ERROR_LOG_GROUP}"
       }
     }
   }
