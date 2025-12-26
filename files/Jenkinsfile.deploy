@@ -30,24 +30,6 @@ pipeline {
     /* ================= SETUP ================= */
     stage('Setup') {
       steps {
-
-        /* ---- Trigger backend deploy & capture deploymentId ---- */
-        script {
-          def resp = sh(
-            script: '''
-              curl -s -X POST http://10.0.1.177:3000/api/deploy \
-                -H "Content-Type: application/json" \
-                -d '{"appId":"HM001"}'
-            ''',
-            returnStdout: true
-          ).trim()
-
-          echo "Backend response: ${resp}"
-
-          def json = readJSON text: resp
-          env.DEPLOYMENT_ID = json.deploymentId
-        }
-
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
@@ -78,18 +60,6 @@ pipeline {
           }
         }
 
-        /* ---- Send runtime info to backend ---- */
-        sh """
-          curl -X POST http://10.0.1.177:3000/api/deployment/runtime \
-            -H "Content-Type: application/json" \
-            -d '{
-              "deploymentId": "${env.DEPLOYMENT_ID}",
-              "instanceId": "${env.INSTANCE_ID}",
-              "accessLogGroup": "${env.NGINX_ACCESS_LOG_GROUP}",
-              "errorLogGroup": "${env.NGINX_ERROR_LOG_GROUP}"
-            }'
-        """
-
         /* ---- Wait for SSH ---- */
         sh '''
           echo "Waiting for SSH on ${EC2_IP}..."
@@ -102,7 +72,7 @@ pipeline {
           done
         '''
 
-        /* ---- Ansible Deploy ---- */
+        /* ---- Ansible Deploy (FIXED) ---- */
         sh '''
           cd files/ansible
 
@@ -124,7 +94,6 @@ pipeline {
         echo "INSTANCE_ID=${INSTANCE_ID}"
         echo "ACCESS_LOG_GROUP=${NGINX_ACCESS_LOG_GROUP}"
         echo "ERROR_LOG_GROUP=${NGINX_ERROR_LOG_GROUP}"
-        echo "DEPLOYMENT_ID=${DEPLOYMENT_ID}"
       }
     }
   }
