@@ -37,7 +37,7 @@ pipeline {
             script: '''
               curl -s -X POST http://10.0.1.177:3000/api/deploy \
                 -H "Content-Type: application/json" \
-                -d '{"appId":"petcart"}'
+                -d '{"appId":"HM001"}'
             ''',
             returnStdout: true
           ).trim()
