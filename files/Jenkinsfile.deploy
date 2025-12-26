@@ -35,7 +35,7 @@ pipeline {
         script {
           def resp = sh(
             script: '''
-              curl -s -X POST http://localhost:3000/api/deploy \
+              curl -s -X POST http://10.0.1.177:3000/api/deploy \
                 -H "Content-Type: application/json" \
                 -d '{"appId":"petcart"}'
             ''',
