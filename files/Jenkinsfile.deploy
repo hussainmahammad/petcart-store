@@ -87,6 +87,16 @@ pipeline {
       }
     }
 
+    /* ================= VALIDATE ================= */
+    stage('Validate') {
+      steps {
+        echo "Validating deployment..."
+        sh '''
+          curl -f http://${EC2_IP} || (echo "Validation failed!" && exit 1)
+        '''
+      }
+    }
+
     /* ================= COMPLETE ================= */
     stage('Complete') {
       steps {
