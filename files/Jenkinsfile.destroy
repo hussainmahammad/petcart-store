@@ -2,16 +2,21 @@ pipeline {
   agent { label 'agent-b' }
 
   parameters {
-    choice(name: 'ENVIRONMENT', choices: ['ec2', 'eks'], description: 'Destroy target')
+    choice(
+      name: 'ENVIRONMENT',
+      choices: ['ec2', 'eks'],
+      description: 'What to destroy'
+    )
   }
 
   environment {
     AWS_REGION = 'us-east-1'
-    ECR_REPO = 'petcart'
+    ECR_REPO   = 'petcart'
   }
 
   stages {
 
+    /* ================= PREPARE ================= */
     stage('Prepare') {
       steps {
         checkout scm
@@ -23,11 +28,18 @@ pipeline {
       when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
         ]) {
           sh '''
+            set -e
+
+            echo "Destroying EC2 infrastructure..."
             cd files/terraform/ec2
+            terraform init
             terraform destroy -auto-approve
+
+            echo "EC2 infrastructure destroyed"
           '''
         }
       }
@@ -38,18 +50,26 @@ pipeline {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
         ]) {
           sh '''
+            set -e
+
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            cd files/eksctl
-            eksctl delete cluster --name petcart-eks --region ${AWS_REGION}
+            echo "Deleting EKS cluster..."
+            eksctl delete cluster \
+              --name petcart-eks \
+              --region ${AWS_REGION}
 
+            echo "Deleting ECR repository (and images)..."
             aws ecr delete-repository \
               --repository-name ${ECR_REPO} \
               --region ${AWS_REGION} \
               --force || echo "ECR repo already deleted"
+
+            echo "EKS infrastructure destroyed"
           '''
         }
       }
