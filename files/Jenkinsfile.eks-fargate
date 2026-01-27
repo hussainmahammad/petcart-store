@@ -13,7 +13,7 @@ pipeline {
       }
     }
 
-    stage('Create EKS Cluster') {
+    stage('Create EKS Fargate Cluster') {
       steps {
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
@@ -29,10 +29,19 @@ pipeline {
 
     stage('Verify Cluster') {
       steps {
-        sh '''
-          kubectl get nodes
-          kubectl get pods -A
-        '''
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            aws eks update-kubeconfig \
+              --region us-east-1 \
+              --name petcart-eks
+
+            kubectl get nodes
+            kubectl get pods -A
+          '''
+        }
       }
     }
   }
