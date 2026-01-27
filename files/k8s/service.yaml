@@ -1,1 +1,13 @@
-
+apiVersion: v1
+kind: Service
+metadata:
+  name: petcart-service
+  namespace: petcart
+spec:
+  type: LoadBalancer
+  selector:
+    app: petcart
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
