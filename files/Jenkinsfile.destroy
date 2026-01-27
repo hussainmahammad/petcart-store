@@ -1,70 +1,63 @@
 pipeline {
   agent { label 'agent-b' }
 
+  parameters {
+    choice(name: 'ENVIRONMENT', choices: ['ec2', 'eks'], description: 'Destroy target')
+  }
+
   environment {
     AWS_REGION = 'us-east-1'
+    ECR_REPO = 'petcart'
   }
 
   stages {
 
-    /* ---------------- COMPLETE ---------------- */
-    stage('Complete') {
+    stage('Prepare') {
       steps {
-        echo 'Starting destroy process'
+        checkout scm
       }
     }
 
-    /* ---------------- VALIDATE ---------------- */
-    stage('Validate') {
+    /* ================= EC2 DESTROY ================= */
+    stage('Destroy EC2') {
+      when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
-        echo 'Validate phase (pre-destroy checks)'
-      }
-    }
-
-    /* ---------------- DEPLOY (DESTROY LOGIC) ---------------- */
-    stage('Deploy') {
-      steps {
-        echo 'Destroy phase (Terraform destroy)'
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
         ]) {
           sh '''
-            echo "Destroying infrastructure in Account C..."
-            cd files/terraform
-            terraform init
+            cd files/terraform/ec2
             terraform destroy -auto-approve
           '''
         }
       }
     }
 
-    /* ---------------- SETUP ---------------- */
-    stage('Setup') {
+    /* ================= EKS DESTROY ================= */
+    stage('Destroy EKS') {
+      when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
-        echo 'Cleanup configuration & state'
-      }
-    }
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    /* ---------------- BUILD ---------------- */
-    stage('Build') {
-      steps {
-        echo 'Build cleanup (nothing to build during destroy)'
-      }
-    }
+            cd files/eksctl
+            eksctl delete cluster --name petcart-eks --region ${AWS_REGION}
 
-    /* ---------------- PREPARE ---------------- */
-    stage('Prepare') {
-      steps {
-        echo 'Prepare cleanup'
-        checkout scm
+            aws ecr delete-repository \
+              --repository-name ${ECR_REPO} \
+              --region ${AWS_REGION} \
+              --force || echo "ECR repo already deleted"
+          '''
+        }
       }
     }
   }
 
   post {
     always {
-      echo "🧹 Cleaning Jenkins workspace"
       cleanWs()
     }
   }
