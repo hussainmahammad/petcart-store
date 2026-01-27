@@ -1,1 +1,19 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
 
+metadata:
+  name: petcart-eks
+  region: us-east-1
+  tags:
+    project: petcart
+    environment: demo
+    managed-by: eksctl
+
+iam:
+  withOIDC: true
+
+fargateProfiles:
+  - name: petcart-fargate
+    selectors:
+      - namespace: default
+      - namespace: petcart
