@@ -47,16 +47,31 @@ pipeline {
     stage('Deploy') {
       steps {
 
-        /* ---- Terraform Outputs ---- */
+        /* ---- Terraform Outputs (FIXED PATH) ---- */
         withCredentials([
           [$class: 'AmazonWebServicesCredentialsBinding',
            credentialsId: 'account-c-aws']
         ]) {
           script {
-            env.EC2_IP = sh(script: "cd files/terraform && terraform output -raw public_ip", returnStdout: true).trim()
-            env.INSTANCE_ID = sh(script: "cd files/terraform && terraform output -raw instance_id", returnStdout: true).trim()
-            env.NGINX_ACCESS_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_access_log_group", returnStdout: true).trim()
-            env.NGINX_ERROR_LOG_GROUP = sh(script: "cd files/terraform && terraform output -raw nginx_error_log_group", returnStdout: true).trim()
+            env.EC2_IP = sh(
+              script: "cd files/terraform/ec2 && terraform output -raw public_ip",
+              returnStdout: true
+            ).trim()
+
+            env.INSTANCE_ID = sh(
+              script: "cd files/terraform/ec2 && terraform output -raw instance_id",
+              returnStdout: true
+            ).trim()
+
+            env.NGINX_ACCESS_LOG_GROUP = sh(
+              script: "cd files/terraform/ec2 && terraform output -raw nginx_access_log_group",
+              returnStdout: true
+            ).trim()
+
+            env.NGINX_ERROR_LOG_GROUP = sh(
+              script: "cd files/terraform/ec2 && terraform output -raw nginx_error_log_group",
+              returnStdout: true
+            ).trim()
           }
         }
 
@@ -72,7 +87,7 @@ pipeline {
           done
         '''
 
-        /* ---- Ansible Deploy (FIXED) ---- */
+        /* ---- Ansible Deploy ---- */
         sh '''
           cd files/ansible
 
