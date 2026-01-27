@@ -2,13 +2,21 @@ pipeline {
   agent { label 'agent-b' }
 
   parameters {
-    choice(name: 'ENVIRONMENT', choices: ['ec2', 'eks'], description: 'Deploy target')
-    choice(name: 'EKS_MODE', choices: ['fargate', 'nodegroup'], description: 'EKS mode (only if ENVIRONMENT=eks)')
+    choice(
+      name: 'ENVIRONMENT',
+      choices: ['ec2', 'eks'],
+      description: 'Deploy target'
+    )
+    choice(
+      name: 'EKS_MODE',
+      choices: ['fargate', 'nodegroup'],
+      description: 'EKS mode (only if ENVIRONMENT=eks)'
+    )
   }
 
   environment {
     AWS_REGION = 'us-east-1'
-    ECR_REPO = 'petcart'
+    ECR_REPO   = 'petcart'
   }
 
   stages {
@@ -25,21 +33,26 @@ pipeline {
       when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
         ]) {
           sh '''
+            set -e
+
             echo "Building frontend..."
             cd app
             npm install
+            chmod +x node_modules/.bin/vite
             npm run build
 
+            echo "Creating EC2 infra..."
             cd ../files/terraform/ec2
             terraform init
             terraform apply -auto-approve
 
             EC2_IP=$(terraform output -raw public_ip)
 
-            echo "Waiting for SSH..."
+            echo "Waiting for SSH on EC2..."
             for i in {1..30}; do
               ssh -i /home/jenkins/.ssh/hussaincloud \
                 -o StrictHostKeyChecking=no \
@@ -48,11 +61,14 @@ pipeline {
               sleep 10
             done
 
+            echo "Deploying app using Ansible..."
             cd ../../ansible
             envsubst < inventory.tpl > inventory.ini
             ansible-playbook -i inventory.ini deploy.yml
 
+            echo "===================================="
             echo "Application URL: http://$EC2_IP"
+            echo "===================================="
           '''
         }
       }
@@ -63,15 +79,19 @@ pipeline {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
         ]) {
           sh '''
+            set -e
+
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Logging into ECR..."
+            echo "Ensuring ECR repository exists..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
+            echo "Logging into ECR..."
             aws ecr get-login-password --region ${AWS_REGION} \
               | docker login --username AWS --password-stdin \
                 $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com
@@ -83,7 +103,7 @@ pipeline {
             docker push \
               $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Creating EKS cluster..."
+            echo "Creating EKS cluster (${EKS_MODE})..."
             cd files/eksctl
             if [ "${EKS_MODE}" = "fargate" ]; then
               eksctl create cluster -f cluster-fargate.yaml
@@ -91,14 +111,34 @@ pipeline {
               eksctl create cluster -f cluster-nodegroup.yaml
             fi
 
-            aws eks update-kubeconfig --region ${AWS_REGION} --name petcart-eks
+            echo "Updating kubeconfig..."
+            aws eks update-kubeconfig \
+              --region ${AWS_REGION} \
+              --name petcart-eks
 
+            echo "Deploying Kubernetes resources..."
             kubectl apply -f ../k8s/namespace.yaml
             kubectl apply -f ../k8s/deployment.yaml
             kubectl apply -f ../k8s/service.yaml
 
-            echo "Waiting for LoadBalancer..."
-            kubectl get svc -n petcart --watch
+            echo "Waiting for LoadBalancer URL..."
+            for i in {1..30}; do
+              LB_URL=$(kubectl get svc petcart-service -n petcart \
+                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+              if [ -n "$LB_URL" ]; then
+                echo "===================================="
+                echo "Application URL: http://$LB_URL"
+                echo "===================================="
+                exit 0
+              fi
+
+              echo "LoadBalancer not ready yet... waiting"
+              sleep 10
+            done
+
+            echo "ERROR: LoadBalancer URL not available after timeout"
+            exit 1
           '''
         }
       }
