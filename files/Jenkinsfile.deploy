@@ -1,8 +1,14 @@
 pipeline {
   agent { label 'agent-b' }
 
+  parameters {
+    choice(name: 'ENVIRONMENT', choices: ['ec2', 'eks'], description: 'Deploy target')
+    choice(name: 'EKS_MODE', choices: ['fargate', 'nodegroup'], description: 'EKS mode (only if ENVIRONMENT=eks)')
+  }
+
   environment {
     AWS_REGION = 'us-east-1'
+    ECR_REPO = 'petcart'
   }
 
   stages {
@@ -14,111 +20,87 @@ pipeline {
       }
     }
 
-    /* ================= BUILD ================= */
-    stage('Build') {
-      steps {
-        sh '''
-          echo "Building frontend (Vite)..."
-          cd app
-          npm install
-          chmod +x node_modules/.bin/vite
-          npm run build
-        '''
-      }
-    }
-
-    /* ================= SETUP ================= */
-    stage('Setup') {
+    /* ================= EC2 DEPLOY ================= */
+    stage('Deploy EC2') {
+      when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
         ]) {
           sh '''
-            cd files/terraform/ec2
+            echo "Building frontend..."
+            cd app
+            npm install
+            npm run build
+
+            cd ../files/terraform/ec2
             terraform init
             terraform apply -auto-approve
+
+            EC2_IP=$(terraform output -raw public_ip)
+
+            echo "Waiting for SSH..."
+            for i in {1..30}; do
+              ssh -i /home/jenkins/.ssh/hussaincloud \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                ec2-user@$EC2_IP "echo ready" && break
+              sleep 10
+            done
+
+            cd ../../ansible
+            envsubst < inventory.tpl > inventory.ini
+            ansible-playbook -i inventory.ini deploy.yml
+
+            echo "Application URL: http://$EC2_IP"
           '''
         }
       }
     }
 
-    /* ================= DEPLOY ================= */
-    stage('Deploy') {
+    /* ================= EKS BUILD + DEPLOY ================= */
+    stage('Deploy EKS') {
+      when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
-
-        /* ---- Terraform Outputs (FIXED PATH) ---- */
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']
         ]) {
-          script {
-            env.EC2_IP = sh(
-              script: "cd files/terraform/ec2 && terraform output -raw public_ip",
-              returnStdout: true
-            ).trim()
+          sh '''
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            env.INSTANCE_ID = sh(
-              script: "cd files/terraform/ec2 && terraform output -raw instance_id",
-              returnStdout: true
-            ).trim()
+            echo "Logging into ECR..."
+            aws ecr describe-repositories --repository-names ${ECR_REPO} \
+              || aws ecr create-repository --repository-name ${ECR_REPO}
 
-            env.NGINX_ACCESS_LOG_GROUP = sh(
-              script: "cd files/terraform/ec2 && terraform output -raw nginx_access_log_group",
-              returnStdout: true
-            ).trim()
+            aws ecr get-login-password --region ${AWS_REGION} \
+              | docker login --username AWS --password-stdin \
+                $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            env.NGINX_ERROR_LOG_GROUP = sh(
-              script: "cd files/terraform/ec2 && terraform output -raw nginx_error_log_group",
-              returnStdout: true
-            ).trim()
-          }
+            echo "Building Docker image..."
+            docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
+            docker tag ${ECR_REPO}:latest \
+              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+            docker push \
+              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
+            echo "Creating EKS cluster..."
+            cd files/eksctl
+            if [ "${EKS_MODE}" = "fargate" ]; then
+              eksctl create cluster -f cluster-fargate.yaml
+            else
+              eksctl create cluster -f cluster-nodegroup.yaml
+            fi
+
+            aws eks update-kubeconfig --region ${AWS_REGION} --name petcart-eks
+
+            kubectl apply -f ../k8s/namespace.yaml
+            kubectl apply -f ../k8s/deployment.yaml
+            kubectl apply -f ../k8s/service.yaml
+
+            echo "Waiting for LoadBalancer..."
+            kubectl get svc -n petcart --watch
+          '''
         }
-
-        /* ---- Wait for SSH ---- */
-        sh '''
-          echo "Waiting for SSH on ${EC2_IP}..."
-          for i in {1..30}; do
-            ssh -i /home/jenkins/.ssh/hussaincloud \
-                -o StrictHostKeyChecking=no \
-                -o ConnectTimeout=5 \
-                ec2-user@${EC2_IP} "echo SSH ready" && break
-            sleep 10
-          done
-        '''
-
-        /* ---- Ansible Deploy ---- */
-        sh '''
-          cd files/ansible
-
-          echo "Generating inventory.ini..."
-          envsubst < inventory.tpl > inventory.ini
-
-          echo "Inventory file:"
-          cat inventory.ini
-
-          ansible-playbook -i inventory.ini deploy.yml
-        '''
-      }
-    }
-
-    /* ================= VALIDATE ================= */
-    stage('Validate') {
-      steps {
-        echo "Validating deployment..."
-        sh '''
-          curl -f http://${EC2_IP} || (echo "Validation failed!" && exit 1)
-        '''
-      }
-    }
-
-    /* ================= COMPLETE ================= */
-    stage('Complete') {
-      steps {
-        echo "URL: http://${EC2_IP}"
-        echo "INSTANCE_ID=${INSTANCE_ID}"
-        echo "ACCESS_LOG_GROUP=${NGINX_ACCESS_LOG_GROUP}"
-        echo "ERROR_LOG_GROUP=${NGINX_ERROR_LOG_GROUP}"
       }
     }
   }
