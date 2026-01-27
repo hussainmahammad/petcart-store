@@ -4,7 +4,7 @@ metadata:
   name: petcart-deployment
   namespace: petcart
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: petcart
