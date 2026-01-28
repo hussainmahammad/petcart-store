@@ -56,18 +56,18 @@ pipeline {
           sh '''
             set -e
 
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-            echo "Deleting EKS cluster..."
+            echo "Deleting EKS cluster (if exists)..."
             eksctl delete cluster \
               --name petcart-eks \
-              --region ${AWS_REGION}
+              --region ${AWS_REGION} \
+              || echo "EKS cluster already deleted or not found"
 
-            echo "Deleting ECR repository (and images)..."
+            echo "Deleting ECR repository (and images) if exists..."
             aws ecr delete-repository \
               --repository-name ${ECR_REPO} \
               --region ${AWS_REGION} \
-              --force || echo "ECR repo already deleted"
+              --force \
+              || echo "ECR repository already deleted or not found"
 
             echo "EKS infrastructure destroyed"
           '''
