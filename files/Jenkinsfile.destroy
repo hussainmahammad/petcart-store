@@ -12,6 +12,7 @@ pipeline {
   environment {
     AWS_REGION = 'us-east-1'
     ECR_REPO   = 'petcart'
+    CLUSTER    = 'petcart-eks'
   }
 
   stages {
@@ -22,6 +23,7 @@ pipeline {
       }
     }
 
+    /* ================= EC2 DESTROY ================= */
     stage('Destroy EC2') {
       when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
@@ -39,6 +41,7 @@ pipeline {
       }
     }
 
+    /* ================= EKS DESTROY ================= */
     stage('Destroy EKS') {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
@@ -49,16 +52,25 @@ pipeline {
           sh '''
             set -e
 
-            eksctl delete cluster \
-              --name petcart-eks \
-              --region ${AWS_REGION} \
-              || true
+            echo "Checking if EKS cluster exists..."
+            if eksctl get cluster --name ${CLUSTER} --region ${AWS_REGION} >/dev/null 2>&1; then
+              echo "Deleting EKS cluster ${CLUSTER}..."
+              eksctl delete cluster \
+                --name ${CLUSTER} \
+                --region ${AWS_REGION}
+            else
+              echo "EKS cluster does not exist, skipping delete"
+            fi
 
-            aws ecr delete-repository \
-              --repository-name ${ECR_REPO} \
-              --region ${AWS_REGION} \
-              --force \
-              || true
+            echo "Deleting ECR repository if exists..."
+            aws ecr describe-repositories \
+              --repository-names ${ECR_REPO} \
+              --region ${AWS_REGION} >/dev/null 2>&1 \
+              && aws ecr delete-repository \
+                   --repository-name ${ECR_REPO} \
+                   --region ${AWS_REGION} \
+                   --force \
+              || echo "ECR repository does not exist, skipping"
           '''
         }
       }
