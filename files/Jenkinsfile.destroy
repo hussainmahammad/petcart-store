@@ -16,14 +16,12 @@ pipeline {
 
   stages {
 
-    /* ================= PREPARE ================= */
-    stage('Prepare') {
+    stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    /* ================= EC2 DESTROY ================= */
     stage('Destroy EC2') {
       when { expression { params.ENVIRONMENT == 'ec2' } }
       steps {
@@ -33,19 +31,14 @@ pipeline {
         ]) {
           sh '''
             set -e
-
-            echo "Destroying EC2 infrastructure..."
             cd files/terraform/ec2
             terraform init
             terraform destroy -auto-approve
-
-            echo "EC2 infrastructure destroyed"
           '''
         }
       }
     }
 
-    /* ================= EKS DESTROY ================= */
     stage('Destroy EKS') {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
@@ -56,20 +49,16 @@ pipeline {
           sh '''
             set -e
 
-            echo "Deleting EKS cluster (if exists)..."
             eksctl delete cluster \
               --name petcart-eks \
               --region ${AWS_REGION} \
-              || echo "EKS cluster already deleted or not found"
+              || true
 
-            echo "Deleting ECR repository (and images) if exists..."
             aws ecr delete-repository \
               --repository-name ${ECR_REPO} \
               --region ${AWS_REGION} \
               --force \
-              || echo "ECR repository already deleted or not found"
-
-            echo "EKS infrastructure destroyed"
+              || true
           '''
         }
       }
