@@ -7,11 +7,6 @@ pipeline {
       choices: ['ec2', 'eks'],
       description: 'Deploy target'
     )
-    choice(
-      name: 'EKS_MODE',
-      choices: ['fargate', 'nodegroup'],
-      description: 'EKS mode (only if ENVIRONMENT=eks)'
-    )
   }
 
   environment {
@@ -21,8 +16,7 @@ pipeline {
 
   stages {
 
-    /* ================= PREPARE ================= */
-    stage('Prepare') {
+    stage('Checkout') {
       steps {
         checkout scm
       }
@@ -50,9 +44,9 @@ pipeline {
             terraform init
             terraform apply -auto-approve
 
-            export EC2_IP=$(terraform output -raw public_ip)
+            EC2_IP=$(terraform output -raw public_ip)
 
-            echo "Waiting for SSH on EC2 ($EC2_IP)..."
+            echo "Waiting for SSH..."
             for i in {1..30}; do
               ssh -i /home/jenkins/.ssh/hussaincloud \
                 -o StrictHostKeyChecking=no \
@@ -61,8 +55,9 @@ pipeline {
               sleep 10
             done
 
-            echo "Deploying app using Ansible..."
+            echo "Deploying app via Ansible..."
             cd ../../ansible
+            export EC2_IP=$EC2_IP
             envsubst < inventory.tpl > inventory.ini
             ansible-playbook -i inventory.ini deploy.yml
 
@@ -74,8 +69,8 @@ pipeline {
       }
     }
 
-    /* ================= EKS BUILD + DEPLOY ================= */
-    stage('Deploy EKS') {
+    /* ================= EKS DEPLOY (FARGATE) ================= */
+    stage('Deploy EKS (Fargate)') {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
         withCredentials([
@@ -87,40 +82,32 @@ pipeline {
 
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Ensuring ECR repository exists..."
+            echo "Ensuring ECR repo..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
-            echo "Logging into ECR..."
+            echo "Login to ECR..."
             aws ecr get-login-password --region ${AWS_REGION} \
               | docker login --username AWS --password-stdin \
                 $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            echo "Building Docker image..."
+            echo "Build & push Docker image..."
             docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
               $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
               $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Creating EKS cluster (${EKS_MODE})..."
+            echo "Create EKS Fargate cluster..."
             cd files/eksctl
-            if [ "${EKS_MODE}" = "fargate" ]; then
-              eksctl create cluster -f cluster-fargate.yaml
-            else
-              eksctl create cluster -f cluster-nodegroup.yaml
-            fi
+            eksctl create cluster -f cluster-fargate.yaml
 
-            echo "Updating kubeconfig..."
+            echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name petcart-eks
 
-            echo "Installing AWS Load Balancer Controller..."
-            chmod +x ../eks/alb-controller/install.sh
-            ../eks/alb-controller/install.sh
-
-            echo "Deploying Kubernetes resources..."
+            echo "Deploy Kubernetes resources..."
             kubectl apply -f ../k8s/namespace.yaml
             kubectl apply -f ../k8s/deployment.yaml
             kubectl apply -f ../k8s/service.yaml
@@ -129,19 +116,16 @@ pipeline {
             for i in {1..30}; do
               LB_URL=$(kubectl get svc petcart-service -n petcart \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-
               if [ -n "$LB_URL" ]; then
                 echo "===================================="
                 echo "Application URL: http://$LB_URL"
                 echo "===================================="
                 exit 0
               fi
-
-              echo "LoadBalancer not ready yet... waiting"
               sleep 10
             done
 
-            echo "ERROR: LoadBalancer URL not available after timeout"
+            echo "ERROR: LoadBalancer not ready"
             exit 1
           '''
         }
