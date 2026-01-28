@@ -12,6 +12,9 @@ pipeline {
   environment {
     AWS_REGION = 'us-east-1'
     ECR_REPO   = 'petcart'
+    CLUSTER    = 'petcart-eks'
+    NAMESPACE  = 'petcart'
+    APP_LABEL  = 'app=petcart'
   }
 
   stages {
@@ -82,7 +85,7 @@ pipeline {
 
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Ensuring ECR repo..."
+            echo "Ensuring ECR repository..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
@@ -98,23 +101,32 @@ pipeline {
             docker push \
               $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Create EKS Fargate cluster..."
+            echo "Create EKS Fargate cluster (idempotent)..."
             cd files/eksctl
-            eksctl create cluster -f cluster-fargate.yaml
+            eksctl create cluster -f cluster-fargate.yaml || true
 
             echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
-              --name petcart-eks
+              --name ${CLUSTER}
 
-            echo "Deploy Kubernetes resources..."
+            echo "Apply namespace & deployment..."
             kubectl apply -f ../k8s/namespace.yaml
             kubectl apply -f ../k8s/deployment.yaml
+
+            echo "Waiting for Fargate pod to be Ready..."
+            kubectl wait \
+              --namespace ${NAMESPACE} \
+              --for=condition=Ready pod \
+              --selector=${APP_LABEL} \
+              --timeout=300s
+
+            echo "Apply Service (LoadBalancer)..."
             kubectl apply -f ../k8s/service.yaml
 
-            echo "Waiting for LoadBalancer URL..."
+            echo "Waiting for LoadBalancer DNS..."
             for i in {1..30}; do
-              LB_URL=$(kubectl get svc petcart-service -n petcart \
+              LB_URL=$(kubectl get svc petcart-service -n ${NAMESPACE} \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
               if [ -n "$LB_URL" ]; then
                 echo "===================================="
@@ -122,10 +134,11 @@ pipeline {
                 echo "===================================="
                 exit 0
               fi
+              echo "Still waiting for LoadBalancer..."
               sleep 10
             done
 
-            echo "ERROR: LoadBalancer not ready"
+            echo "ERROR: LoadBalancer was not provisioned"
             exit 1
           '''
         }
@@ -133,8 +146,9 @@ pipeline {
     }
   }
 
+  /* ================= CLEANUP ================= */
   post {
-    always {
+    success {
       cleanWs()
     }
   }
