@@ -7,6 +7,11 @@ pipeline {
       choices: ['ec2', 'eks'],
       description: 'Deploy target'
     )
+    choice(
+      name: 'EKS_MODE',
+      choices: ['fargate', 'ec2'],
+      description: 'EKS compute type (used only if ENVIRONMENT=eks)'
+    )
   }
 
   environment {
@@ -72,8 +77,8 @@ pipeline {
       }
     }
 
-    /* ================= EKS DEPLOY (FARGATE) ================= */
-    stage('Deploy EKS (Fargate)') {
+    /* ================= EKS DEPLOY ================= */
+    stage('Deploy EKS') {
       when { expression { params.ENVIRONMENT == 'eks' } }
       steps {
         withCredentials([
@@ -101,9 +106,18 @@ pipeline {
             docker push \
               $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Create EKS Fargate cluster (idempotent)..."
+            echo "Selecting EKS mode: ${EKS_MODE}"
+            if [ "${EKS_MODE}" = "fargate" ]; then
+              CLUSTER_FILE="cluster-fargate.yaml"
+              SERVICE_FILE="service-fargate.yaml"
+            else
+              CLUSTER_FILE="cluster-ec2.yaml"
+              SERVICE_FILE="service-ec2.yaml"
+            fi
+
+            echo "Creating EKS cluster (idempotent)..."
             cd files/eksctl
-            eksctl create cluster -f cluster-fargate.yaml || true
+            eksctl create cluster -f ${CLUSTER_FILE} || true
 
             echo "Update kubeconfig..."
             aws eks update-kubeconfig \
@@ -114,15 +128,15 @@ pipeline {
             kubectl apply -f ../k8s/namespace.yaml
             kubectl apply -f ../k8s/deployment.yaml
 
-            echo "Waiting for Fargate pod to be Ready..."
+            echo "Waiting for pod to be Ready..."
             kubectl wait \
               --namespace ${NAMESPACE} \
               --for=condition=Ready pod \
               --selector=${APP_LABEL} \
               --timeout=300s
 
-            echo "Apply Service (LoadBalancer)..."
-            kubectl apply -f ../k8s/service.yaml
+            echo "Apply Service..."
+            kubectl apply -f ../k8s/${SERVICE_FILE}
 
             echo "Waiting for LoadBalancer DNS..."
             for i in {1..30}; do
