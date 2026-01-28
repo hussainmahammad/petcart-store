@@ -64,10 +64,6 @@ pipeline {
             echo "Deploying app using Ansible..."
             cd ../../ansible
             envsubst < inventory.tpl > inventory.ini
-
-            echo "Generated inventory:"
-            cat inventory.ini
-
             ansible-playbook -i inventory.ini deploy.yml
 
             echo "===================================="
@@ -119,6 +115,10 @@ pipeline {
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name petcart-eks
+
+            echo "Installing AWS Load Balancer Controller..."
+            chmod +x ../eks/alb-controller/install.sh
+            ../eks/alb-controller/install.sh
 
             echo "Deploying Kubernetes resources..."
             kubectl apply -f ../k8s/namespace.yaml
