@@ -2,10 +2,10 @@ pipeline {
   agent { label 'agent-b' }
 
   environment {
-    AWS_REGION  = "us-east-1"
+    AWS_REGION   = "us-east-1"
     CLUSTER_NAME = "petcart-eks"
-    NAMESPACE   = "petcart"
-    ECR_REPO    = "petcart"
+    NAMESPACE    = "petcart"
+    ECR_REPO     = "petcart"
   }
 
   parameters {
@@ -49,21 +49,21 @@ pipeline {
 
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Ensure ECR repo exists..."
+            echo "Ensure ECR repository exists..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
             echo "Login to ECR..."
             aws ecr get-login-password --region ${AWS_REGION} \
               | docker login --username AWS --password-stdin \
-                $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com
+                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            echo "Build & push image..."
+            echo "Build & push Docker image..."
             docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
-              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+              ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
-              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+              ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
             echo "Create EKS cluster (idempotent)..."
             eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
@@ -73,8 +73,16 @@ pipeline {
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
-            echo "Install ALB controller..."
+            echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
+
+            echo "Waiting for AWS Load Balancer Controller webhook..."
+            kubectl wait \
+              --namespace kube-system \
+              --for=condition=Available deployment/aws-load-balancer-controller \
+              --timeout=300s
+
+            echo "ALB controller is ready"
 
             echo "Deploy Kubernetes resources..."
             kubectl apply -f files/k8s/namespace.yaml
@@ -82,20 +90,23 @@ pipeline {
             kubectl apply -f files/k8s/service.yaml
             kubectl apply -f files/k8s/ingress.yaml
 
-            echo "Wait for ALB DNS..."
+            echo "Waiting for ALB DNS..."
             for i in {1..40}; do
               ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
               if [ -n "$ALB_URL" ]; then
                 echo "===================================="
                 echo "Application URL: http://$ALB_URL"
                 echo "===================================="
                 exit 0
               fi
+
+              echo "ALB not ready yet... retrying"
               sleep 15
             done
 
-            echo "ERROR: ALB not provisioned"
+            echo "ERROR: ALB was not provisioned"
             exit 1
           '''
         }
