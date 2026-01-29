@@ -3,13 +3,10 @@ kind: Service
 metadata:
   name: petcart-service
   namespace: petcart
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb-ip"
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: petcart
   ports:
     - port: 80
       targetPort: 80
-
