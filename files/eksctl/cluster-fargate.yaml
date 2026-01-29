@@ -4,16 +4,19 @@ kind: ClusterConfig
 metadata:
   name: petcart-eks
   region: us-east-1
-  tags:
-    project: petcart
-    environment: demo
-    managed-by: eksctl
 
 iam:
   withOIDC: true
 
 fargateProfiles:
-  - name: petcart-fargate
+  - name: default
     selectors:
       - namespace: default
+
+  - name: kube-system
+    selectors:
+      - namespace: kube-system
+
+  - name: petcart
+    selectors:
       - namespace: petcart
