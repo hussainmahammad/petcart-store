@@ -2,9 +2,10 @@ pipeline {
   agent { label 'agent-b' }
 
   environment {
-    AWS_REGION = "us-east-1"
+    AWS_REGION  = "us-east-1"
     CLUSTER_NAME = "petcart-eks"
-    NAMESPACE = "petcart"
+    NAMESPACE   = "petcart"
+    ECR_REPO    = "petcart"
   }
 
   parameters {
@@ -26,7 +27,6 @@ pipeline {
     stage('Prepare Scripts') {
       steps {
         sh '''
-          echo "Setting execute permissions on scripts..."
           chmod +x files/scripts/*.sh || true
         '''
       }
@@ -35,86 +35,70 @@ pipeline {
     /* =======================
        EKS – FARGATE PATH
        ======================= */
-    stage('Create EKS Cluster (Fargate)') {
+    stage('Deploy to EKS (Fargate + ALB)') {
       when {
         expression { params.DEPLOY_TARGET == 'eks-fargate' }
       }
       steps {
-        sh '''
-          echo "Creating EKS Fargate cluster..."
-          eksctl create cluster -f files/eksctl/cluster-fargate.yaml
-        '''
-      }
-    }
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            set -e
 
-    stage('Update kubeconfig') {
-      when {
-        expression { params.DEPLOY_TARGET == 'eks-fargate' }
-      }
-      steps {
-        sh '''
-          aws eks update-kubeconfig \
-            --region ${AWS_REGION} \
-            --name ${CLUSTER_NAME}
-        '''
-      }
-    }
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    stage('Install AWS Load Balancer Controller') {
-      when {
-        expression { params.DEPLOY_TARGET == 'eks-fargate' }
-      }
-      steps {
-        sh '''
-          echo "Installing ALB Controller..."
-          bash files/scripts/install-alb-controller.sh
-        '''
-      }
-    }
+            echo "Ensure ECR repo exists..."
+            aws ecr describe-repositories --repository-names ${ECR_REPO} \
+              || aws ecr create-repository --repository-name ${ECR_REPO}
 
-    stage('Deploy App to EKS (Ingress + ALB)') {
-      when {
-        expression { params.DEPLOY_TARGET == 'eks-fargate' }
-      }
-      steps {
-        sh '''
-          echo "Deploying application to EKS..."
+            echo "Login to ECR..."
+            aws ecr get-login-password --region ${AWS_REGION} \
+              | docker login --username AWS --password-stdin \
+                $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-          kubectl apply -f files/k8s/namespace.yaml
-          kubectl apply -f files/k8s/deployment.yaml
-          kubectl apply -f files/k8s/service.yaml
-          kubectl apply -f files/k8s/ingress.yaml
-        '''
-      }
-    }
+            echo "Build & push image..."
+            docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
+            docker tag ${ECR_REPO}:latest \
+              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+            docker push \
+              $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-    stage('Wait for ALB Public URL') {
-      when {
-        expression { params.DEPLOY_TARGET == 'eks-fargate' }
-      }
-      steps {
-        sh '''
-          echo "Waiting for ALB DNS from Ingress..."
+            echo "Create EKS cluster (idempotent)..."
+            eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
 
-          for i in {1..40}; do
-            ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
-              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            echo "Update kubeconfig..."
+            aws eks update-kubeconfig \
+              --region ${AWS_REGION} \
+              --name ${CLUSTER_NAME}
 
-            if [ ! -z "$ALB_URL" ]; then
-              echo "======================================"
-              echo "Application is LIVE at:"
-              echo "http://$ALB_URL"
-              echo "======================================"
-              exit 0
-            fi
+            echo "Install ALB controller..."
+            bash files/scripts/install-alb-controller.sh
 
-            echo "ALB not ready yet... retrying"
-            sleep 15
-          done
+            echo "Deploy Kubernetes resources..."
+            kubectl apply -f files/k8s/namespace.yaml
+            kubectl apply -f files/k8s/deployment.yaml
+            kubectl apply -f files/k8s/service.yaml
+            kubectl apply -f files/k8s/ingress.yaml
 
-          echo "ERROR: ALB was not provisioned"
-          exit 1
-        '''
+            echo "Wait for ALB DNS..."
+            for i in {1..40}; do
+              ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+              if [ -n "$ALB_URL" ]; then
+                echo "===================================="
+                echo "Application URL: http://$ALB_URL"
+                echo "===================================="
+                exit 0
+              fi
+              sleep 15
+            done
+
+            echo "ERROR: ALB not provisioned"
+            exit 1
+          '''
+        }
       }
     }
 
@@ -128,18 +112,16 @@ pipeline {
       steps {
         sh '''
           echo "Deploying application to EC2..."
-          # your existing EC2 deploy logic stays here
+          # existing EC2 logic
         '''
       }
     }
   }
 
   post {
-    failure {
-      echo "Deployment failed. Check logs."
-    }
-    success {
-      echo "Deployment completed successfully."
+    always {
+      echo "Cleaning workspace..."
+      cleanWs(deleteDirs: true, disableDeferredWipeout: true)
     }
   }
 }
