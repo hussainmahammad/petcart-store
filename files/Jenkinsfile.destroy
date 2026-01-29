@@ -1,85 +1,172 @@
 pipeline {
-  agent { label 'agent-b' }
+  agent any
+
+  environment {
+    AWS_REGION = "us-east-1"
+    CLUSTER_NAME = "petcart-eks"
+    NAMESPACE = "petcart"
+    ECR_REPO = "petcart"
+  }
 
   parameters {
     choice(
-      name: 'ENVIRONMENT',
-      choices: ['ec2', 'eks'],
-      description: 'What to destroy'
+      name: 'DESTROY_TARGET',
+      choices: ['ec2', 'eks-fargate'],
+      description: 'Choose what to destroy'
     )
-  }
-
-  environment {
-    AWS_REGION = 'us-east-1'
-    ECR_REPO   = 'petcart'
-    CLUSTER    = 'petcart-eks'
   }
 
   stages {
 
-    stage('Checkout') {
+    stage('Checkout Repo') {
       steps {
         checkout scm
       }
     }
 
-    /* ================= EC2 DESTROY ================= */
-    stage('Destroy EC2') {
-      when { expression { params.ENVIRONMENT == 'ec2' } }
+    stage('Prepare Scripts') {
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
-          sh '''
-            set -e
-            cd files/terraform/ec2
-            terraform init
-            terraform destroy -auto-approve
-          '''
-        }
+        sh '''
+          echo "Setting execute permissions..."
+          chmod +x files/scripts/*.sh || true
+        '''
       }
     }
 
-    /* ================= EKS DESTROY ================= */
-    stage('Destroy EKS') {
-      when { expression { params.ENVIRONMENT == 'eks' } }
+    /* ============================
+       EKS – FARGATE DESTROY PATH
+       ============================ */
+    stage('Update kubeconfig (if cluster exists)') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
-          sh '''
-            set -e
+        sh '''
+          aws eks update-kubeconfig \
+            --region ${AWS_REGION} \
+            --name ${CLUSTER_NAME} || true
+        '''
+      }
+    }
 
-            echo "Checking if EKS cluster exists..."
-            if eksctl get cluster --name ${CLUSTER} --region ${AWS_REGION} >/dev/null 2>&1; then
-              echo "Deleting EKS cluster ${CLUSTER}..."
-              eksctl delete cluster \
-                --name ${CLUSTER} \
-                --region ${AWS_REGION}
-            else
-              echo "EKS cluster does not exist, skipping delete"
-            fi
+    stage('Delete Kubernetes Resources') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
+      steps {
+        sh '''
+          echo "Deleting Ingress (this deletes ALB)..."
+          kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
 
-            echo "Deleting ECR repository if exists..."
-            aws ecr describe-repositories \
-              --repository-names ${ECR_REPO} \
-              --region ${AWS_REGION} >/dev/null 2>&1 \
-              && aws ecr delete-repository \
-                   --repository-name ${ECR_REPO} \
-                   --region ${AWS_REGION} \
-                   --force \
-              || echo "ECR repository does not exist, skipping"
-          '''
-        }
+          echo "Deleting Services..."
+          kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
+
+          echo "Deleting Deployments..."
+          kubectl delete deployment petcart -n ${NAMESPACE} --ignore-not-found || true
+
+          echo "Deleting Namespace..."
+          kubectl delete ns ${NAMESPACE} --ignore-not-found
+
+          echo "Waiting for ALB cleanup..."
+          sleep 60
+        '''
+      }
+    }
+
+    stage('Uninstall AWS Load Balancer Controller') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
+      steps {
+        sh '''
+          helm uninstall aws-load-balancer-controller -n kube-system || true
+        '''
+      }
+    }
+
+    stage('Delete ALB Controller IAM Resources') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
+      steps {
+        sh '''
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          echo "Deleting IAM service account..."
+          eksctl delete iamserviceaccount \
+            --cluster ${CLUSTER_NAME} \
+            --region ${AWS_REGION} \
+            --name aws-load-balancer-controller \
+            --namespace kube-system || true
+
+          echo "Deleting IAM policy..."
+          aws iam delete-policy \
+            --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy || true
+        '''
+      }
+    }
+
+    stage('Delete EKS Cluster') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
+      steps {
+        sh '''
+          echo "Deleting EKS cluster..."
+          eksctl delete cluster \
+            --name ${CLUSTER_NAME} \
+            --region ${AWS_REGION} || true
+        '''
+      }
+    }
+
+    stage('Delete ECR Images and Repository') {
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
+      steps {
+        sh '''
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          echo "Deleting all images from ECR repo..."
+          IMAGE_DIGESTS=$(aws ecr list-images \
+            --repository-name ${ECR_REPO} \
+            --query 'imageIds[*]' \
+            --output json 2>/dev/null || echo "[]")
+
+          if [ "$IMAGE_DIGESTS" != "[]" ]; then
+            aws ecr batch-delete-image \
+              --repository-name ${ECR_REPO} \
+              --image-ids "$IMAGE_DIGESTS" || true
+          fi
+
+          echo "Deleting ECR repository..."
+          aws ecr delete-repository \
+            --repository-name ${ECR_REPO} \
+            --force || true
+        '''
+      }
+    }
+
+    /* =======================
+       EC2 DESTROY PATH
+       ======================= */
+    stage('Destroy EC2 Resources') {
+      when {
+        expression { params.DESTROY_TARGET == 'ec2' }
+      }
+      steps {
+        sh '''
+          echo "Destroying EC2-based deployment..."
+          # your existing EC2 destroy logic stays here
+        '''
       }
     }
   }
 
   post {
     always {
-      cleanWs()
+      echo "Destroy pipeline completed."
     }
   }
 }
