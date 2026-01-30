@@ -73,6 +73,12 @@ pipeline {
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
+            echo "Enable EKS control plane logging (required for Container Insights)..."
+            aws eks update-cluster-config \
+              --region ${AWS_REGION} \
+              --name ${CLUSTER_NAME} \
+              --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+
             echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
 
@@ -83,7 +89,6 @@ pipeline {
               --timeout=300s
 
             echo "Setting up Fluent Bit IAM (IRSA)..."
-
             FLUENT_BIT_POLICY_NAME=PetcartFluentBitPolicy
 
             cat > fluent-bit-policy.json <<EOF
