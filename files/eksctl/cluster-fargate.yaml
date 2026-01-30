@@ -8,6 +8,18 @@ metadata:
 iam:
   withOIDC: true
 
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator
+      - controllerManager
+      - scheduler
+
+  containerInsights:
+    enabled: true
+
 fargateProfiles:
   - name: default
     selectors:
