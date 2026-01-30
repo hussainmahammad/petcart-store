@@ -17,9 +17,6 @@ cloudWatch:
       - controllerManager
       - scheduler
 
-  containerInsights:
-    enabled: true
-
 fargateProfiles:
   - name: default
     selectors:
