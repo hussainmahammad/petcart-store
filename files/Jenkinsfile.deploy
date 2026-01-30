@@ -50,7 +50,7 @@ pipeline {
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
             echo "Ensure ECR repository exists..."
-            aws ecr describe-repositories --repository-names ${ECR_REPO} \
+            aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
             echo "Login to ECR..."
@@ -83,94 +83,50 @@ pipeline {
             echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
 
-            echo "Waiting for AWS Load Balancer Controller to be ready..."
+            echo "Waiting for AWS Load Balancer Controller..."
             kubectl wait \
               --namespace kube-system \
               --for=condition=Available deployment/aws-load-balancer-controller \
               --timeout=300s
 
-            echo "Setting up Fluent Bit IAM (IRSA)..."
-            FLUENT_BIT_POLICY_NAME=PetcartFluentBitPolicy
+            echo "Create aws-observability namespace (idempotent)..."
+            kubectl create namespace aws-observability --dry-run=client -o yaml | kubectl apply -f -
 
-            cat > fluent-bit-policy.json <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
+            echo "Create Fluent Bit IRSA (OFFICIAL, FARGATE-SAFE)..."
+            bash files/scripts/create-fluentbit-irsa.sh \
+              ${CLUSTER_NAME} \
+              ${AWS_REGION} \
+              ${ACCOUNT_ID}
 
-            aws iam create-policy \
-              --policy-name $FLUENT_BIT_POLICY_NAME \
-              --policy-document file://fluent-bit-policy.json \
-              || echo "Fluent Bit policy already exists"
+            echo "Deploy AWS official Fluent Bit for Fargate..."
+            kubectl apply -f files/k8s/aws-fluent-bit-fargate.yaml
 
-            eksctl create iamserviceaccount \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              --namespace aws-observability \
-              --name fluent-bit \
-              --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/$FLUENT_BIT_POLICY_NAME \
-              --approve \
-              --override-existing-serviceaccounts
-
-            echo "Deploying Fluent Bit..."
-            kubectl apply -f files/k8s/fluent-bit.yaml
-
-            echo "Deploy Kubernetes application resources..."
+            echo "Deploy application manifests..."
             kubectl apply -f files/k8s/namespace.yaml
             kubectl apply -f files/k8s/deployment.yaml
             kubectl apply -f files/k8s/service.yaml
             kubectl apply -f files/k8s/ingress.yaml
 
-            echo "Waiting for ALB DNS (10s interval, max 10 minutes)..."
+            echo "Waiting for ALB DNS (10s interval, 10 min timeout)..."
             ALB_URL=""
             for i in {1..60}; do
               ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
 
-              if [ -n "$ALB_URL" ]; then
-                echo "ALB DNS found: $ALB_URL"
-                break
-              fi
-
-              echo "ALB DNS not ready yet... attempt $i/60"
+              [ -n "$ALB_URL" ] && break
               sleep 10
             done
 
-            if [ -z "$ALB_URL" ]; then
-              echo "ERROR: ALB DNS was not provisioned within 10 minutes"
-              exit 1
-            fi
+            [ -z "$ALB_URL" ] && echo "ERROR: ALB not created" && exit 1
 
-            echo "Waiting for application to return HTTP 200 (10s interval, max 10 minutes)..."
+            echo "Waiting for HTTP 200..."
             for i in {1..60}; do
               HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-
-              if [ "$HTTP_CODE" = "200" ]; then
-                echo "===================================="
-                echo "Application is LIVE and serving traffic"
-                echo "URL: http://$ALB_URL"
-                echo "===================================="
-                exit 0
-              fi
-
-              echo "App not ready yet (HTTP $HTTP_CODE)... attempt $i/60"
+              [ "$HTTP_CODE" = "200" ] && echo "APP LIVE: http://$ALB_URL" && exit 0
               sleep 10
             done
 
-            echo "ERROR: Application did not return HTTP 200 within 10 minutes"
+            echo "ERROR: App did not return 200"
             exit 1
           '''
         }
@@ -195,7 +151,6 @@ EOF
 
   post {
     always {
-      echo "Cleaning workspace..."
       cleanWs(deleteDirs: true, disableDeferredWipeout: true)
     }
   }
