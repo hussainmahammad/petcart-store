@@ -73,11 +73,12 @@ pipeline {
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
-            echo "Enable EKS control plane logging (required for Container Insights)..."
+            echo "Enable EKS control plane logging (idempotent)..."
             aws eks update-cluster-config \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME} \
-              --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+              --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}' \
+              || true
 
             echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
