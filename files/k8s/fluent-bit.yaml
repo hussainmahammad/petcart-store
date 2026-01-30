@@ -8,8 +8,6 @@ kind: ServiceAccount
 metadata:
   name: fluent-bit
   namespace: aws-observability
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/petcart-fluent-bit-role
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -75,9 +73,9 @@ spec:
         - name: fluent-bit
           image: amazon/aws-for-fluent-bit:latest
           resources:
-            limits:
-              memory: 200Mi
-              cpu: 200m
             requests:
               memory: 100Mi
               cpu: 100m
+            limits:
+              memory: 200Mi
+              cpu: 200m
