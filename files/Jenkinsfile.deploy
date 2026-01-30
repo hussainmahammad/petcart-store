@@ -76,13 +76,11 @@ pipeline {
             echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
 
-            echo "Waiting for AWS Load Balancer Controller webhook..."
+            echo "Waiting for AWS Load Balancer Controller to be ready..."
             kubectl wait \
               --namespace kube-system \
               --for=condition=Available deployment/aws-load-balancer-controller \
               --timeout=300s
-
-            echo "ALB controller is ready"
 
             echo "Deploy Kubernetes resources..."
             kubectl apply -f files/k8s/namespace.yaml
@@ -91,22 +89,42 @@ pipeline {
             kubectl apply -f files/k8s/ingress.yaml
 
             echo "Waiting for ALB DNS..."
+            ALB_URL=""
             for i in {1..40}; do
               ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
               if [ -n "$ALB_URL" ]; then
+                echo "ALB DNS found: $ALB_URL"
+                break
+              fi
+
+              echo "ALB DNS not ready yet..."
+              sleep 15
+            done
+
+            if [ -z "$ALB_URL" ]; then
+              echo "ERROR: ALB DNS was not provisioned"
+              exit 1
+            fi
+
+            echo "Waiting for application to start serving traffic (HTTP 200)..."
+            for i in {1..20}; do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+
+              if [ "$HTTP_CODE" = "200" ]; then
                 echo "===================================="
-                echo "Application URL: http://$ALB_URL"
+                echo "Application is LIVE and serving traffic"
+                echo "URL: http://$ALB_URL"
                 echo "===================================="
                 exit 0
               fi
 
-              echo "ALB not ready yet... retrying"
+              echo "App not ready yet (HTTP $HTTP_CODE), retrying..."
               sleep 15
             done
 
-            echo "ERROR: ALB was not provisioned"
+            echo "ERROR: ALB is up but application is not responding"
             exit 1
           '''
         }
