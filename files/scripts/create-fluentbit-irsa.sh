@@ -1,14 +1,18 @@
 #!/bin/bash
 set -e
 
-CLUSTER_NAME=$1
-REGION=$2
-ACCOUNT_ID=$3
+CLUSTER_NAME="$1"
+REGION="$2"
+ACCOUNT_ID="$3"
 
-ROLE_NAME=PetcartFluentBitRole
-POLICY_NAME=PetcartFluentBitPolicy
+ROLE_NAME="PetcartFluentBitRole"
+POLICY_NAME="PetcartFluentBitPolicy"
+NAMESPACE="aws-observability"
+SERVICE_ACCOUNT="fluent-bit"
 
-echo "Creating IAM policy if not exists..."
+echo "--------------------------------------------------"
+echo "Creating / Ensuring IAM policy for Fluent Bit"
+echo "--------------------------------------------------"
 
 cat > /tmp/fluent-bit-policy.json <<EOF
 {
@@ -29,19 +33,28 @@ cat > /tmp/fluent-bit-policy.json <<EOF
 }
 EOF
 
-aws iam create-policy \
-  --policy-name $POLICY_NAME \
-  --policy-document file:///tmp/fluent-bit-policy.json \
-  >/dev/null 2>&1 || echo "Policy already exists"
+POLICY_ARN="arn:aws:iam::$ACCOUNT_ID:policy/$POLICY_NAME"
 
-echo "Creating IAM Role via eksctl..."
+aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1 || \
+aws iam create-policy \
+  --policy-name "$POLICY_NAME" \
+  --policy-document file:///tmp/fluent-bit-policy.json \
+  >/dev/null
+
+echo "--------------------------------------------------"
+echo "Creating / Updating IRSA service account"
+echo "--------------------------------------------------"
 
 eksctl create iamserviceaccount \
-  --cluster $CLUSTER_NAME \
-  --region $REGION \
-  --namespace aws-observability \
-  --name fluent-bit \
-  --role-name $ROLE_NAME \
-  --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/$POLICY_NAME \
+  --cluster "$CLUSTER_NAME" \
+  --region "$REGION" \
+  --namespace "$NAMESPACE" \
+  --name "$SERVICE_ACCOUNT" \
+  --role-name "$ROLE_NAME" \
+  --attach-policy-arn "$POLICY_ARN" \
   --approve \
   --override-existing-serviceaccounts
+
+echo "--------------------------------------------------"
+echo "Fluent Bit IRSA READY"
+echo "--------------------------------------------------"
