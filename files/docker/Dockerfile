@@ -14,8 +14,14 @@ RUN npm run build
 # ---------- RUNTIME STAGE ----------
 FROM nginx:alpine
 
+# Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
+
+# Copy built frontend
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy custom nginx config for SPA routing
+COPY files/docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
