@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aws-observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-for-fluent-bit
+  namespace: aws-observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aws-for-fluent-bit
+  template:
+    metadata:
+      labels:
+        app: aws-for-fluent-bit
+    spec:
+      serviceAccountName: fluent-bit
+      containers:
+        - name: aws-for-fluent-bit
+          image: public.ecr.aws/aws-observability/aws-for-fluent-bit:latest
+          resources:
+            limits:
+              memory: 200Mi
+              cpu: 200m
+            requests:
+              memory: 100Mi
+              cpu: 100m
+          env:
+            - name: REGION
+              value: us-east-1
+            - name: CLUSTER_NAME
+              value: petcart-eks
+            - name: LOG_GROUP_NAME
+              value: /aws/containerinsights/petcart-eks/application
