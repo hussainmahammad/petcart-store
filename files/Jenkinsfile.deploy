@@ -65,7 +65,7 @@ pipeline {
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Create EKS cluster (idempotent)..."
+            echo "Create EKS Fargate cluster (idempotent)..."
             eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
 
             echo "Update kubeconfig..."
@@ -92,14 +92,11 @@ pipeline {
             echo "Create aws-observability namespace (idempotent)..."
             kubectl create namespace aws-observability --dry-run=client -o yaml | kubectl apply -f -
 
-            echo "Create Fluent Bit IRSA (OFFICIAL, FARGATE-SAFE)..."
-            bash files/scripts/create-fluentbit-irsa.sh \
-              ${CLUSTER_NAME} \
-              ${AWS_REGION} \
-              ${ACCOUNT_ID}
+            echo "Attach CloudWatch logging policy to Fargate Pod Execution Role..."
+            bash files/scripts/attach-fargate-logging-policy.sh
 
-            echo "Deploy AWS official Fluent Bit for Fargate..."
-            kubectl apply -f files/k8s/aws-fluent-bit-fargate.yaml
+            echo "Apply aws-logging ConfigMap (Fargate log router)..."
+            kubectl apply -f files/k8s/aws-logging-configmap.yaml
 
             echo "Deploy application manifests..."
             kubectl apply -f files/k8s/namespace.yaml
@@ -112,7 +109,6 @@ pipeline {
             for i in {1..60}; do
               ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
                 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-
               [ -n "$ALB_URL" ] && break
               sleep 10
             done
