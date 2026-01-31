@@ -68,30 +68,6 @@ pipeline {
             echo "Create EKS Fargate cluster (idempotent)..."
             eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
 
-            echo "Enable CloudWatch Observability add-on (Container Insights)..."
-            eksctl create addon \
-              --name amazon-cloudwatch-observability \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} || true
-
-            # ────────────────────────────────────────────────
-            # NEW: Setup ADOT for pod/container metrics in CloudWatch
-            echo "Setup ADOT namespace for metrics..."
-            kubectl apply -f files/k8s/adot-namespace.yaml || true
-
-            echo "Setup ADOT IAM role (IRSA)..."
-            bash files/scripts/install-adot-metrics.sh
-
-            echo "Deploy ADOT collector for pod metrics..."
-            kubectl apply -f files/k8s/adot-collector.yaml
-
-            echo "Waiting for ADOT collector to be ready (up to 5 min)..."
-            kubectl wait --namespace fargate-container-insights \
-              --for=condition=ready pod -l app=adot-collector \
-              --timeout=300s || echo "Warning: ADOT pod wait timed out - continuing..."
-
-            # ────────────────────────────────────────────────
-
             echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
