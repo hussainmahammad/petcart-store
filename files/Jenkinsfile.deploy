@@ -116,17 +116,8 @@ pipeline {
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            # Create control plane ONLY (safe to retry)
-            eksctl create cluster \
-              --name ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              --managed=false || true
-
-            # Create EC2 node group (MANDATORY)
-            eksctl create nodegroup \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              -f files/eksctl/cluster-nodegroup.yaml
+            # ✅ SINGLE correct command (cluster + nodegroup)
+            eksctl create cluster -f files/eksctl/cluster-nodegroup.yaml
 
             aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
 
