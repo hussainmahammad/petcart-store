@@ -29,3 +29,8 @@ fargateProfiles:
   - name: petcart
     selectors:
       - namespace: petcart
+
+  # Added for ADOT Collector (Container Insights metrics on Fargate)
+  - name: container-insights
+    selectors:
+      - namespace: fargate-container-insights
