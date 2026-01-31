@@ -17,13 +17,13 @@ aws iam create-policy \
   --policy-name "$POLICY_NAME" \
   --policy-document file://files/iam/eks-fargate-cloudwatch-policy.json
 
-# Find the Fargate Pod Execution Role
+# Find the Fargate Pod Execution Role for THIS cluster only
 ROLE_NAME=$(aws iam list-roles \
-  --query "Roles[?contains(RoleName, 'FargatePodExecutionRole')].RoleName | [0]" \
+  --query "Roles[?contains(RoleName, '${CLUSTER_NAME}') && contains(RoleName, 'FargatePodExecutionRole')].RoleName | [0]" \
   --output text)
 
 if [ "$ROLE_NAME" = "None" ] || [ -z "$ROLE_NAME" ]; then
-  echo "❌ Fargate Pod Execution Role NOT FOUND"
+  echo "❌ Fargate Pod Execution Role for cluster ${CLUSTER_NAME} NOT FOUND"
   exit 1
 fi
 
