@@ -68,6 +68,12 @@ pipeline {
             echo "Create EKS Fargate cluster (idempotent)..."
             eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
 
+            echo "Enable CloudWatch Observability add-on (Container Insights)..."
+            eksctl create addon \
+              --name amazon-cloudwatch-observability \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} || true
+
             echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
