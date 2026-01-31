@@ -84,6 +84,17 @@ pipeline {
               --name ${CLUSTER_NAME} \
               --region ${AWS_REGION} || true
 
+            echo "Delete CloudWatch log groups (FULL WIPE)..."
+            aws logs describe-log-groups \
+              --log-group-name-prefix /eks/petcart \
+              --region ${AWS_REGION} \
+              --query 'logGroups[].logGroupName' \
+              --output text | while read LOG_GROUP; do
+                aws logs delete-log-group \
+                  --log-group-name "$LOG_GROUP" \
+                  --region ${AWS_REGION} || true
+              done
+
             echo "Delete ECR images and repository..."
             IMAGE_DIGESTS=$(aws ecr list-images \
               --repository-name ${ECR_REPO} \
@@ -100,7 +111,7 @@ pipeline {
               --repository-name ${ECR_REPO} \
               --force || true
 
-            echo "EKS Fargate destroy completed."
+            echo "EKS Fargate FULL destroy completed."
           '''
         }
       }
