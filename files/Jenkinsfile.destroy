@@ -47,44 +47,32 @@ pipeline {
           sh '''
             set +e
 
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-            echo "Update kubeconfig if cluster exists..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME} || true
 
-            echo "Delete Ingress (removes ALB)..."
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
 
-            echo "Delete application Kubernetes resources..."
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
             kubectl delete deployment petcart-deployment -n ${NAMESPACE} --ignore-not-found
             kubectl delete ns ${NAMESPACE} --ignore-not-found
 
-            echo "Delete Fargate logging ConfigMap..."
             kubectl delete configmap aws-logging -n aws-observability --ignore-not-found
-
-            echo "Delete aws-observability namespace..."
             kubectl delete ns aws-observability --ignore-not-found
 
-            echo "Uninstall AWS Load Balancer Controller..."
             helm uninstall aws-load-balancer-controller -n kube-system || true
 
-            echo "Delete ALB controller IAM service account..."
             eksctl delete iamserviceaccount \
               --cluster ${CLUSTER_NAME} \
               --region ${AWS_REGION} \
               --name aws-load-balancer-controller \
               --namespace kube-system || true
 
-            echo "Delete EKS cluster..."
             eksctl delete cluster \
               --name ${CLUSTER_NAME} \
               --region ${AWS_REGION} || true
 
-            echo "Delete CloudWatch log groups (FULL WIPE)..."
             aws logs describe-log-groups \
               --log-group-name-prefix /eks/petcart \
               --region ${AWS_REGION} \
@@ -95,7 +83,6 @@ pipeline {
                   --region ${AWS_REGION} || true
               done
 
-            echo "Delete ECR images and repository..."
             IMAGE_DIGESTS=$(aws ecr list-images \
               --repository-name ${ECR_REPO} \
               --query 'imageIds[*]' \
@@ -132,36 +119,35 @@ pipeline {
           sh '''
             set +e
 
-            echo "Update kubeconfig if cluster exists..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME} || true
 
-            echo "Delete Ingress (removes ALB)..."
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
 
-            echo "Delete application Kubernetes resources..."
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
             kubectl delete deployment petcart-deployment -n ${NAMESPACE} --ignore-not-found
             kubectl delete ns ${NAMESPACE} --ignore-not-found
 
-            echo "Uninstall AWS Load Balancer Controller..."
             helm uninstall aws-load-balancer-controller -n kube-system || true
 
-            echo "Delete ALB controller IAM service account..."
             eksctl delete iamserviceaccount \
               --cluster ${CLUSTER_NAME} \
               --region ${AWS_REGION} \
               --name aws-load-balancer-controller \
               --namespace kube-system || true
 
-            echo "Delete EKS cluster (EC2 node group)..."
+            # Explicit nodegroup delete (safety)
+            eksctl delete nodegroup \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              --name petcart-ng || true
+
             eksctl delete cluster \
               --name ${CLUSTER_NAME} \
               --region ${AWS_REGION} || true
 
-            echo "Delete CloudWatch Container Insights log groups..."
             aws logs describe-log-groups \
               --log-group-name-prefix /aws/containerinsights/${CLUSTER_NAME} \
               --region ${AWS_REGION} \
@@ -172,7 +158,6 @@ pipeline {
                   --region ${AWS_REGION} || true
               done
 
-            echo "Delete ECR images and repository..."
             IMAGE_DIGESTS=$(aws ecr list-images \
               --repository-name ${ECR_REPO} \
               --query 'imageIds[*]' \
@@ -204,7 +189,6 @@ pipeline {
       steps {
         sh '''
           echo "Destroying EC2-based deployment..."
-          # existing EC2 destroy logic
         '''
       }
     }
