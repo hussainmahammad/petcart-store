@@ -21,4 +21,4 @@ managedNodeGroups:
     volumeSize: 20
     ssh:
       allow: true
-      publicKeyName: hussaincloud-key
+      publicKeyName: hussaincloud
