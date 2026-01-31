@@ -89,8 +89,8 @@ pipeline {
               --for=condition=Available deployment/aws-load-balancer-controller \
               --timeout=300s
 
-            echo "Create aws-observability namespace (idempotent)..."
-            kubectl create namespace aws-observability --dry-run=client -o yaml | kubectl apply -f -
+            echo "Apply aws-observability namespace (required for Fargate logging)..."
+            kubectl apply -f files/k8s/aws-observability-namespace.yaml
 
             echo "Attach CloudWatch logging policy to Fargate Pod Execution Role..."
             bash files/scripts/attach-fargate-logging-policy.sh
