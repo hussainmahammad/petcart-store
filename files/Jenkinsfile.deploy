@@ -50,81 +50,40 @@ pipeline {
 
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Ensure ECR repository exists..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
-            echo "Login to ECR..."
             aws ecr get-login-password --region ${AWS_REGION} \
               | docker login --username AWS --password-stdin \
                 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            echo "Build & push Docker image..."
             docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Create EKS Fargate cluster (idempotent)..."
             eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
 
-            echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
-            echo "Enable EKS control plane logging (idempotent)..."
-            aws eks update-cluster-config \
-              --region ${AWS_REGION} \
-              --name ${CLUSTER_NAME} \
-              --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}' \
-              || true
-
-            echo "Install AWS Load Balancer Controller..."
             bash files/scripts/install-alb-controller.sh
 
-            echo "Waiting for AWS Load Balancer Controller..."
             kubectl wait \
               --namespace kube-system \
               --for=condition=Available deployment/aws-load-balancer-controller \
               --timeout=300s
 
-            echo "Apply aws-observability namespace..."
             kubectl apply -f files/k8s/aws-observability-namespace.yaml
-
-            echo "Attach CloudWatch logging policy..."
             bash files/scripts/attach-fargate-logging-policy.sh
-
-            echo "Apply aws-logging ConfigMap..."
             kubectl apply -f files/k8s/aws-logging-configmap.yaml
 
-            echo "Deploy application manifests..."
             kubectl apply -f files/k8s/namespace.yaml
             kubectl apply -f files/k8s/deployment.yaml
             kubectl apply -f files/k8s/service.yaml
             kubectl apply -f files/k8s/ingress.yaml
-
-            echo "Waiting for ALB DNS..."
-            ALB_URL=""
-            for i in {1..60}; do
-              ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
-                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-              [ -n "$ALB_URL" ] && break
-              sleep 10
-            done
-
-            [ -z "$ALB_URL" ] && echo "ERROR: ALB not created" && exit 1
-
-            echo "Waiting for HTTP 200..."
-            for i in {1..60}; do
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-              [ "$HTTP_CODE" = "200" ] && echo "APP LIVE: http://$ALB_URL" && exit 0
-              sleep 10
-            done
-
-            echo "ERROR: App did not return 200"
-            exit 1
           '''
         }
       }
@@ -132,7 +91,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (ONLY NODE WAIT ADDED)
+       (LOGS + METRICS ADDED ONLY HERE)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -148,47 +107,66 @@ pipeline {
 
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            echo "Ensure ECR repository exists..."
             aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
               || aws ecr create-repository --repository-name ${ECR_REPO}
 
-            echo "Login to ECR..."
             aws ecr get-login-password --region ${AWS_REGION} \
               | docker login --username AWS --password-stdin \
                 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            echo "Build & push Docker image..."
             docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            echo "Create EKS cluster with EC2 node group..."
             eksctl create cluster -f files/eksctl/cluster-nodegroup.yaml || true
 
-            echo "Update kubeconfig..."
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
-            echo "Waiting for EC2 nodes to become Ready..."
             kubectl wait --for=condition=Ready nodes --all --timeout=10m
 
-            echo "Install AWS Load Balancer Controller (EC2)..."
             bash files/scripts/install-alb-controller-ec2.sh
 
-            echo "Waiting for AWS Load Balancer Controller..."
             kubectl rollout status deployment/aws-load-balancer-controller \
               -n kube-system --timeout=10m
 
-            echo "Deploy application manifests..."
+            echo "Enable CloudWatch Logs & Metrics for EKS EC2..."
+
+            aws iam create-policy \
+              --policy-name EKS-CloudWatch-Logs-Metrics \
+              --policy-document file://files/iam/cloudwatch-eks-ec2-policy.json \
+              || echo "CloudWatch policy already exists"
+
+            eksctl create iamserviceaccount \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              --namespace amazon-cloudwatch \
+              --name fluent-bit \
+              --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/EKS-CloudWatch-Logs-Metrics \
+              --approve \
+              --override-existing-serviceaccounts \
+              || true
+
+            eksctl create addon \
+              --name amazon-cloudwatch-observability \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              || true
+
+            kubectl rollout restart ds/fluent-bit -n amazon-cloudwatch || true
+            kubectl rollout restart ds/cloudwatch-agent -n amazon-cloudwatch || true
+
+            kubectl rollout status ds/fluent-bit -n amazon-cloudwatch --timeout=5m
+            kubectl rollout status ds/cloudwatch-agent -n amazon-cloudwatch --timeout=5m
+
             kubectl apply -f files/k8s/namespace.yaml
             kubectl apply -f files/k8s/deployment.yaml
             kubectl apply -f files/k8s/service.yaml
             kubectl apply -f files/k8s/ingress.yaml
 
-            echo "Waiting for ALB DNS..."
             ALB_URL=""
             for i in {1..60}; do
               ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
@@ -197,16 +175,14 @@ pipeline {
               sleep 10
             done
 
-            [ -z "$ALB_URL" ] && echo "ERROR: ALB not created" && exit 1
+            [ -z "$ALB_URL" ] && exit 1
 
-            echo "Waiting for HTTP 200..."
             for i in {1..60}; do
               HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-              [ "$HTTP_CODE" = "200" ] && echo "APP LIVE: http://$ALB_URL" && exit 0
+              [ "$HTTP_CODE" = "200" ] && exit 0
               sleep 10
             done
 
-            echo "ERROR: App did not return 200"
             exit 1
           '''
         }
