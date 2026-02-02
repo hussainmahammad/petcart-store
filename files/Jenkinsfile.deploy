@@ -132,7 +132,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (FIXED – EC2 ONLY)
+       (ONLY NODE WAIT ADDED)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -171,6 +171,9 @@ pipeline {
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
+
+            echo "Waiting for EC2 nodes to become Ready..."
+            kubectl wait --for=condition=Ready nodes --all --timeout=10m
 
             echo "Install AWS Load Balancer Controller (EC2)..."
             bash files/scripts/install-alb-controller-ec2.sh
