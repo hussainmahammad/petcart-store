@@ -91,7 +91,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (LOGS + METRICS ADDED ONLY HERE)
+       (LOGS + METRICS – FIXED)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -135,10 +135,12 @@ pipeline {
 
             echo "Enable CloudWatch Logs & Metrics for EKS EC2..."
 
+            kubectl create namespace amazon-cloudwatch || true
+
             aws iam create-policy \
               --policy-name EKS-CloudWatch-Logs-Metrics \
               --policy-document file://files/iam/cloudwatch-eks-ec2-policy.json \
-              || echo "CloudWatch policy already exists"
+              || true
 
             eksctl create iamserviceaccount \
               --cluster ${CLUSTER_NAME} \
