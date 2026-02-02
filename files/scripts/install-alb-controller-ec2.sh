@@ -40,7 +40,7 @@ eksctl create iamserviceaccount \
   --approve \
   --override-existing-serviceaccounts
 
-# 4️⃣ Install / upgrade ALB controller
+# 4️⃣ Install / upgrade AWS Load Balancer Controller (EC2)
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update
 
@@ -49,7 +49,8 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set clusterName="$CLUSTER_NAME" \
   --set region="$REGION" \
   --set vpcId="$VPC_ID" \
+  --set replicaCount=1 \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller
 
-echo "✅ EC2 ALB Controller install triggered"
+echo "✅ EC2 ALB Controller install triggered (replicaCount=1)"
