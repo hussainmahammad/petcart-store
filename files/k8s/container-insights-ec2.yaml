@@ -7,6 +7,15 @@ metadata:
   name: amazon-cloudwatch
 ---
 # =========================
+# ServiceAccount (FIX)
+# =========================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloudwatch-agent
+  namespace: amazon-cloudwatch
+---
+# =========================
 # CloudWatch Agent Config
 # =========================
 apiVersion: v1
