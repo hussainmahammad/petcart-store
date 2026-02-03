@@ -15,7 +15,7 @@ echo "Account ID: $ACCOUNT_ID"
 aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1 || \
 aws iam create-policy \
   --policy-name "$POLICY_NAME" \
-  --policy-document file://files/iam/eks-fargate-cloudwatch-policy.json
+  --policy-document file://files/eks-fargate/iam/eks-fargate-cloudwatch-policy.json
 
 # Find the Fargate Pod Execution Role for THIS cluster only
 ROLE_NAME=$(aws iam list-roles \
