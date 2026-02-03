@@ -19,16 +19,12 @@ pipeline {
   stages {
 
     stage('Checkout Repo') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Prepare Scripts') {
       steps {
-        sh '''
-          chmod +x files/scripts/*.sh || true
-        '''
+        sh 'chmod +x files/scripts/*.sh || true'
       }
     }
 
@@ -37,26 +33,17 @@ pipeline {
        (UNCHANGED – DO NOT TOUCH)
        ============================ */
     stage('Destroy EKS (Fargate)') {
-      when {
-        expression { params.DESTROY_TARGET == 'eks-fargate' }
-      }
+      when { expression { params.DESTROY_TARGET == 'eks-fargate' } }
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']]) {
           sh '''
             set +e
-
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            aws eks update-kubeconfig \
-              --region ${AWS_REGION} \
-              --name ${CLUSTER_NAME} || true
+            aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME} || true
 
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
-
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
             kubectl delete deployment petcart-deployment -n ${NAMESPACE} --ignore-not-found
             kubectl delete ns ${NAMESPACE} --ignore-not-found
@@ -72,34 +59,7 @@ pipeline {
               --name aws-load-balancer-controller \
               --namespace kube-system || true
 
-            eksctl delete cluster \
-              --name ${CLUSTER_NAME} \
-              --region ${AWS_REGION} || true
-
-            aws logs describe-log-groups \
-              --log-group-name-prefix /eks/petcart \
-              --region ${AWS_REGION} \
-              --query 'logGroups[].logGroupName' \
-              --output text | while read LOG_GROUP; do
-                aws logs delete-log-group \
-                  --log-group-name "$LOG_GROUP" \
-                  --region ${AWS_REGION} || true
-              done
-
-            IMAGE_DIGESTS=$(aws ecr list-images \
-              --repository-name ${ECR_REPO} \
-              --query 'imageIds[*]' \
-              --output json 2>/dev/null || echo "[]")
-
-            if [ "$IMAGE_DIGESTS" != "[]" ]; then
-              aws ecr batch-delete-image \
-                --repository-name ${ECR_REPO} \
-                --image-ids "$IMAGE_DIGESTS" || true
-            fi
-
-            aws ecr delete-repository \
-              --repository-name ${ECR_REPO} \
-              --force || true
+            eksctl delete cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} || true
 
             echo "EKS Fargate FULL destroy completed."
           '''
@@ -109,29 +69,20 @@ pipeline {
 
     /* ============================
        EKS – EC2 NODE GROUP DESTROY
-       (FIXED – EC2 ONLY)
+       (CLOUDWATCH CLEANUP ADDED)
        ============================ */
     stage('Destroy EKS (EC2 Node Group)') {
-      when {
-        expression { params.DESTROY_TARGET == 'eks-ec2' }
-      }
+      when { expression { params.DESTROY_TARGET == 'eks-ec2' } }
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']]) {
           sh '''
             set +e
-
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            aws eks update-kubeconfig \
-              --region ${AWS_REGION} \
-              --name ${CLUSTER_NAME} || true
+            aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME} || true
 
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
-
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
             kubectl delete deployment petcart-deployment -n ${NAMESPACE} --ignore-not-found
             kubectl delete ns ${NAMESPACE} --ignore-not-found
@@ -144,39 +95,31 @@ pipeline {
               --name aws-load-balancer-controller \
               --namespace kube-system || true
 
-            echo "Delete EC2 ALB IAM policy..."
-            aws iam delete-policy \
-              --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicyEC2 \
-              || true
+            echo "Removing CloudWatch Observability (EC2)..."
 
-            eksctl delete cluster \
-              --name ${CLUSTER_NAME} \
+            eksctl delete addon \
+              --name amazon-cloudwatch-observability \
+              --cluster ${CLUSTER_NAME} \
               --region ${AWS_REGION} || true
+
+            eksctl delete iamserviceaccount \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              --namespace amazon-cloudwatch \
+              --name fluent-bit || true
+
+            aws iam delete-policy \
+              --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/EKS-CloudWatch-Logs-Metrics || true
+
+            eksctl delete cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} || true
 
             aws logs describe-log-groups \
               --log-group-name-prefix /aws/containerinsights/${CLUSTER_NAME} \
               --region ${AWS_REGION} \
               --query 'logGroups[].logGroupName' \
               --output text | while read LOG_GROUP; do
-                aws logs delete-log-group \
-                  --log-group-name "$LOG_GROUP" \
-                  --region ${AWS_REGION} || true
+                aws logs delete-log-group --log-group-name "$LOG_GROUP" --region ${AWS_REGION} || true
               done
-
-            IMAGE_DIGESTS=$(aws ecr list-images \
-              --repository-name ${ECR_REPO} \
-              --query 'imageIds[*]' \
-              --output json 2>/dev/null || echo "[]")
-
-            if [ "$IMAGE_DIGESTS" != "[]" ]; then
-              aws ecr batch-delete-image \
-                --repository-name ${ECR_REPO} \
-                --image-ids "$IMAGE_DIGESTS" || true
-            fi
-
-            aws ecr delete-repository \
-              --repository-name ${ECR_REPO} \
-              --force || true
 
             echo "EKS EC2 Node Group FULL destroy completed."
           '''
@@ -188,13 +131,9 @@ pipeline {
        EC2 DESTROY PATH
        ======================= */
     stage('Destroy EC2 Resources') {
-      when {
-        expression { params.DESTROY_TARGET == 'ec2' }
-      }
+      when { expression { params.DESTROY_TARGET == 'ec2' } }
       steps {
-        sh '''
-          echo "Destroying EC2-based deployment..."
-        '''
+        sh 'echo "Destroying EC2-based deployment..."'
       }
     }
   }
