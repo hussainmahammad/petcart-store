@@ -27,7 +27,8 @@ pipeline {
     stage('Prepare Scripts') {
       steps {
         sh '''
-          chmod +x files/scripts/*.sh || true
+          chmod +x files/eks-fargate/scripts/*.sh || true
+		  chmod +x files/eks-ec2/scripts/*.sh || true
         '''
       }
     }
@@ -36,6 +37,7 @@ pipeline {
        EKS – FARGATE PATH
        (ALB URL + HEALTH CHECK ADDED)
        ======================= */
+	   
     stage('Deploy to EKS (Fargate + ALB)') {
       when {
         expression { params.DEPLOY_TARGET == 'eks-fargate' }
@@ -57,33 +59,33 @@ pipeline {
               | docker login --username AWS --password-stdin \
                 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
+            docker build -t ${ECR_REPO}:latest -f files/eks-fargate/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            eksctl create cluster -f files/eksctl/cluster-fargate.yaml || true
+            eksctl create cluster -f files/eks-fargate/eksctl/cluster-fargate.yaml || true
 
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
               --name ${CLUSTER_NAME}
 
-            bash files/scripts/install-alb-controller.sh
+            bash files/eks-fargate/scripts/install-alb-controller.sh
 
             kubectl wait \
               --namespace kube-system \
               --for=condition=Available deployment/aws-load-balancer-controller \
               --timeout=300s
 
-            kubectl apply -f files/k8s/aws-observability-namespace.yaml
-            bash files/scripts/attach-fargate-logging-policy.sh
-            kubectl apply -f files/k8s/aws-logging-configmap.yaml
+            kubectl apply -f files/eks-fargate/k8s/aws-observability-namespace.yaml
+            bash files/eks-fargate/scripts/attach-fargate-logging-policy.sh
+            kubectl apply -f files/eks-fargate/k8s/aws-logging-configmap.yaml
 
-            kubectl apply -f files/k8s/namespace.yaml
-            kubectl apply -f files/k8s/deployment.yaml
-            kubectl apply -f files/k8s/service.yaml
-            kubectl apply -f files/k8s/ingress.yaml
+            kubectl apply -f files/eks-fargate/k8s/namespace.yaml
+            kubectl apply -f files/eks-fargate/k8s/deployment.yaml
+            kubectl apply -f files/eks-fargate/k8s/service.yaml
+            kubectl apply -f files/eks-fargate/k8s/ingress.yaml
 
             echo "Waiting for ALB DNS (Fargate)..."
             ALB_URL=""
@@ -144,13 +146,13 @@ pipeline {
               | docker login --username AWS --password-stdin \
                 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-            docker build -t ${ECR_REPO}:latest -f files/docker/Dockerfile .
+            docker build -t ${ECR_REPO}:latest -f files/eks-ec2/docker/Dockerfile .
             docker tag ${ECR_REPO}:latest \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
             docker push \
               ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-            eksctl create cluster -f files/eksctl/cluster-nodegroup.yaml || true
+            eksctl create cluster -f files/eks-ec2/eksctl/cluster-nodegroup.yaml || true
 
             aws eks update-kubeconfig \
               --region ${AWS_REGION} \
@@ -158,15 +160,15 @@ pipeline {
 
             kubectl wait --for=condition=Ready nodes --all --timeout=10m
 
-            bash files/scripts/install-alb-controller-ec2.sh
+            bash files/eks-ec2/scripts/install-alb-controller-ec2.sh
 
             kubectl rollout status deployment/aws-load-balancer-controller \
               -n kube-system --timeout=10m
 
-            kubectl apply -f files/k8s/namespace.yaml
-            kubectl apply -f files/k8s/deployment.yaml
-            kubectl apply -f files/k8s/service.yaml
-            kubectl apply -f files/k8s/ingress.yaml
+            kubectl apply -f files/eks-ec2/k8s/namespace.yaml
+            kubectl apply -f files/eks-ec2/k8s/deployment.yaml
+            kubectl apply -f files/eks-ec2/k8s/service.yaml
+            kubectl apply -f files/eks-ec2/k8s/ingress.yaml
 
             ALB_URL=""
             for i in {1..60}; do
