@@ -91,7 +91,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (LOGS + METRICS – FIXED)
+       (CLEAN + CORRECT)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -133,36 +133,8 @@ pipeline {
             kubectl rollout status deployment/aws-load-balancer-controller \
               -n kube-system --timeout=10m
 
-            echo "Enable CloudWatch Logs & Metrics for EKS EC2..."
-
-            kubectl create namespace amazon-cloudwatch || true
-
-            aws iam create-policy \
-              --policy-name EKS-CloudWatch-Logs-Metrics \
-              --policy-document file://files/iam/cloudwatch-eks-ec2-policy.json \
-              || true
-
-            eksctl create iamserviceaccount \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              --namespace amazon-cloudwatch \
-              --name fluent-bit \
-              --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/EKS-CloudWatch-Logs-Metrics \
-              --approve \
-              --override-existing-serviceaccounts \
-              || true
-
-            eksctl create addon \
-              --name amazon-cloudwatch-observability \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              || true
-
-            kubectl rollout restart ds/fluent-bit -n amazon-cloudwatch || true
-            kubectl rollout restart ds/cloudwatch-agent -n amazon-cloudwatch || true
-
-            kubectl rollout status ds/fluent-bit -n amazon-cloudwatch --timeout=5m
-            kubectl rollout status ds/cloudwatch-agent -n amazon-cloudwatch --timeout=5m
+            echo "Installing CloudWatch logs & metrics (EC2)..."
+            kubectl apply -f files/k8s/container-insights-ec2.yaml
 
             kubectl apply -f files/k8s/namespace.yaml
             kubectl apply -f files/k8s/deployment.yaml
