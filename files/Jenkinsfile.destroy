@@ -70,7 +70,7 @@ pipeline {
             # Cleanup IAM policy (created by deploy)
             # --------------------
             aws iam delete-policy \
-              --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicyEC2 || true
+              --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy || true
 
             echo "EKS Fargate FULL destroy completed."
           '''
