@@ -21,10 +21,9 @@ pipeline {
       steps { checkout scm }
     }
 
-
-
     /* ==================================================
        EKS – FARGATE DESTROY (FULL WIPEOUT)
+       (UNCHANGED)
        ================================================== */
     stage('Destroy EKS (Fargate)') {
       when { expression { params.DESTROY_TARGET == 'eks-fargate' } }
@@ -38,9 +37,6 @@ pipeline {
 
             aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME} || true
 
-            # --------------------
-            # App resources
-            # --------------------
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
@@ -50,9 +46,6 @@ pipeline {
             kubectl delete configmap aws-logging -n aws-observability --ignore-not-found
             kubectl delete ns aws-observability --ignore-not-found
 
-            # --------------------
-            # ALB Controller
-            # --------------------
             helm uninstall aws-load-balancer-controller -n kube-system || true
 
             eksctl delete iamserviceaccount \
@@ -61,14 +54,8 @@ pipeline {
               --namespace kube-system \
               --name aws-load-balancer-controller || true
 
-            # --------------------
-            # Delete EKS cluster
-            # --------------------
             eksctl delete cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} || true
 
-            # --------------------
-            # Cleanup IAM policy (created by deploy)
-            # --------------------
             aws iam delete-policy \
               --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy || true
 
@@ -80,6 +67,7 @@ pipeline {
 
     /* ==================================================
        EKS – EC2 NODE GROUP DESTROY (FULL WIPEOUT)
+       (FIXED)
        ================================================== */
     stage('Destroy EKS (EC2 Node Group)') {
       when { expression { params.DESTROY_TARGET == 'eks-ec2' } }
@@ -146,7 +134,7 @@ pipeline {
               done
 
             # --------------------
-            # IAM policy cleanup
+            # IAM policy cleanup (EC2 ALB Controller)
             # --------------------
             aws iam delete-policy \
               --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicyEC2 || true
