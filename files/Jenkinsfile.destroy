@@ -21,11 +21,7 @@ pipeline {
       steps { checkout scm }
     }
 
-    stage('Prepare Scripts') {
-      steps {
-        sh 'chmod +x files/scripts/*.sh || true'
-      }
-    }
+
 
     /* ==================================================
        EKS – FARGATE DESTROY (FULL WIPEOUT)
