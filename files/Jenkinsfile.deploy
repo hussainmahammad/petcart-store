@@ -123,7 +123,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (UNCHANGED)
+       (FIXED – ADDON BASED)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -164,6 +164,31 @@ pipeline {
 
             kubectl rollout status deployment/aws-load-balancer-controller \
               -n kube-system --timeout=10m
+
+            echo "Installing CloudWatch Observability Add-on (logs + metrics)..."
+
+            # Ensure OIDC (required for IRSA)
+            eksctl utils associate-iam-oidc-provider \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              --approve
+
+            # Create IAM service account for CloudWatch Agent
+            eksctl create iamserviceaccount \
+              --cluster ${CLUSTER_NAME} \
+              --region ${AWS_REGION} \
+              --namespace amazon-cloudwatch \
+              --name cloudwatch-agent \
+              --attach-policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
+              --approve \
+              --override-existing-serviceaccounts
+
+            # Install CloudWatch Observability Add-on
+            aws eks create-addon \
+              --cluster-name ${CLUSTER_NAME} \
+              --addon-name amazon-cloudwatch-observability \
+              --region ${AWS_REGION} \
+              || echo "CloudWatch add-on already installed"
 
             kubectl apply -f files/eks-ec2/k8s/namespace.yaml
             kubectl apply -f files/eks-ec2/k8s/deployment.yaml
