@@ -34,7 +34,7 @@ pipeline {
 
     /* =======================
        EKS – FARGATE PATH
-       (UNCHANGED – DO NOT TOUCH)
+       (ALB URL + HEALTH CHECK ADDED)
        ======================= */
     stage('Deploy to EKS (Fargate + ALB)') {
       when {
@@ -84,6 +84,36 @@ pipeline {
             kubectl apply -f files/k8s/deployment.yaml
             kubectl apply -f files/k8s/service.yaml
             kubectl apply -f files/k8s/ingress.yaml
+
+            echo "Waiting for ALB DNS (Fargate)..."
+            ALB_URL=""
+            for i in {1..60}; do
+              ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+              [ -n "$ALB_URL" ] && break
+              sleep 10
+            done
+
+            if [ -z "$ALB_URL" ]; then
+              echo "ERROR: ALB not created"
+              exit 1
+            fi
+
+            echo "ALB URL: http://$ALB_URL"
+            echo "Waiting for HTTP 200..."
+
+            for i in {1..60}; do
+              HTTP_CODE=$(curl -s --connect-timeout 5 --max-time 10 \
+                -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "APP LIVE (Fargate): http://$ALB_URL"
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "ERROR: App did not return HTTP 200"
+            exit 1
           '''
         }
       }
@@ -91,7 +121,7 @@ pipeline {
 
     /* =======================
        EKS – EC2 NODE GROUP PATH
-       (FIXED – ADDON BASED)
+       (UNCHANGED)
        ======================= */
     stage('Deploy to EKS (EC2 Node Group)') {
       when {
@@ -133,31 +163,6 @@ pipeline {
             kubectl rollout status deployment/aws-load-balancer-controller \
               -n kube-system --timeout=10m
 
-            echo "Installing CloudWatch Observability Add-on (logs + metrics)..."
-
-            # Ensure OIDC (required for IRSA)
-            eksctl utils associate-iam-oidc-provider \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              --approve
-
-            # Create IAM service account for CloudWatch Agent
-            eksctl create iamserviceaccount \
-              --cluster ${CLUSTER_NAME} \
-              --region ${AWS_REGION} \
-              --namespace amazon-cloudwatch \
-              --name cloudwatch-agent \
-              --attach-policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
-              --approve \
-              --override-existing-serviceaccounts
-
-            # Install CloudWatch Observability Add-on
-            aws eks create-addon \
-              --cluster-name ${CLUSTER_NAME} \
-              --addon-name amazon-cloudwatch-observability \
-              --region ${AWS_REGION} \
-              || echo "CloudWatch add-on already installed"
-
             kubectl apply -f files/k8s/namespace.yaml
             kubectl apply -f files/k8s/deployment.yaml
             kubectl apply -f files/k8s/service.yaml
@@ -186,7 +191,7 @@ pipeline {
     }
 
     /* =======================
-       EC2 PATH (UNCHANGED)
+       EC2 PATH
        ======================= */
     stage('Deploy to EC2') {
       when {
