@@ -27,7 +27,7 @@ eksctl utils associate-iam-oidc-provider \
 # 2️⃣ Create EC2-specific IAM policy
 aws iam create-policy \
   --policy-name "$POLICY_NAME" \
-  --policy-document file://files/alb/iam-policy-ec2.json \
+  --policy-document file://files/eks-ec2/iam/alb-controller-policy.json \
   || echo "IAM policy already exists"
 
 # 3️⃣ Create / update IAM service account
