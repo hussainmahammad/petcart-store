@@ -29,7 +29,7 @@ eksctl utils associate-iam-oidc-provider \
 # ====== IAM POLICY ======
 aws iam create-policy \
   --policy-name "$POLICY_NAME" \
-  --policy-document file://files/alb/iam-policy.json \
+  --policy-document file://files/eks-fargate/iam/alb-controller-policy.json \
   || echo "IAM policy already exists"
 
 # ====== IAM SERVICE ACCOUNT ======
