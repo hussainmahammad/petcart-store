@@ -217,24 +217,54 @@ pipeline {
       }
     }
 
-    /* =======================
-       EC2 PATH
-       ======================= */
-    stage('Deploy to EC2') {
-      when {
-        expression { params.DEPLOY_TARGET == 'ec2' }
-      }
-      steps {
-        sh '''
-          echo "Deploying application to EC2..."
-        '''
-      }
-    }
+/* =======================
+   EC2 – GOLDEN AMI + ASG
+   ======================= */
+stage('Deploy to EC2 (Golden AMI + ASG)') {
+  when {
+    expression { params.DEPLOY_TARGET == 'ec2' }
   }
+  steps {
+    withCredentials([
+      [$class: 'AmazonWebServicesCredentialsBinding',
+       credentialsId: 'account-c-aws']
+    ]) {
+      sh '''
+        set -e
 
-  post {
-    always {
-      cleanWs(deleteDirs: true, disableDeferredWipeout: true)
+        echo "=============================="
+        echo "Building frontend"
+        echo "=============================="
+        cd app
+        npm install
+        chmod +x node_modules/.bin/vite
+        npm run build
+        cd ..
+
+        echo "=============================="
+        echo "Building Golden AMI with Packer"
+        echo "=============================="
+        cd files/ec2/packer
+        packer init .
+        packer build petcart-ami.pkr.hcl
+        cd ../../..
+
+        echo "=============================="
+        echo "Deploying infrastructure with Terraform"
+        echo "=============================="
+        cd files/ec2/terraform
+        terraform init
+        terraform apply -auto-approve
+
+        echo "=============================="
+        echo "Fetching ALB URL"
+        echo "=============================="
+        ALB_URL=$(terraform output -raw alb_dns_name)
+
+        echo ""
+        echo "🚀 EC2 Application is LIVE"
+        echo "👉 http://${ALB_URL}"
+      '''
     }
   }
 }
