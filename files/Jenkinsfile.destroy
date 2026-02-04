@@ -18,7 +18,9 @@ pipeline {
   stages {
 
     stage('Checkout Repo') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     /* ==================================================
@@ -26,9 +28,14 @@ pipeline {
        (UNCHANGED)
        ================================================== */
     stage('Destroy EKS (Fargate)') {
-      when { expression { params.DESTROY_TARGET == 'eks-fargate' } }
+      when {
+        expression { params.DESTROY_TARGET == 'eks-fargate' }
+      }
       steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']]) {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
           sh '''
             set +e
             echo "Starting FULL Fargate destroy..."
@@ -70,9 +77,14 @@ pipeline {
        (FIXED)
        ================================================== */
     stage('Destroy EKS (EC2 Node Group)') {
-      when { expression { params.DESTROY_TARGET == 'eks-ec2' } }
+      when {
+        expression { params.DESTROY_TARGET == 'eks-ec2' }
+      }
       steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'account-c-aws']]) {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
           sh '''
             set +e
             echo "Starting FULL EC2 EKS destroy..."
@@ -145,34 +157,37 @@ pipeline {
       }
     }
 
-/* =======================
-   EC2 – DESTROY (ASG + ALB)
-   ======================= */
-stage('Destroy EC2 (ASG + ALB)') {
-  when {
-    expression { params.DESTROY_TARGET == 'ec2' }
-  }
-  steps {
-    withCredentials([
-      [$class: 'AmazonWebServicesCredentialsBinding',
-       credentialsId: 'account-c-aws']
-    ]) {
-      sh '''
-        set +e
+    /* =======================
+       EC2 – DESTROY (ASG + ALB)
+       ======================= */
+    stage('Destroy EC2 (ASG + ALB)') {
+      when {
+        expression { params.DESTROY_TARGET == 'ec2' }
+      }
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding',
+           credentialsId: 'account-c-aws']
+        ]) {
+          sh '''
+            set +e
 
-        echo "=============================="
-        echo "Destroying EC2 infrastructure"
-        echo "=============================="
+            echo "=============================="
+            echo "Destroying EC2 infrastructure"
+            echo "=============================="
 
-        cd files/ec2/terraform
+            cd files/ec2/terraform
 
-        terraform init
-        terraform destroy -auto-approve
+            terraform init
+            terraform destroy -auto-approve
 
-        echo ""
-        echo "✅ EC2 infrastructure destroyed successfully"
-        echo "ℹ️ Golden AMIs are preserved"
-      '''
+            echo ""
+            echo "✅ EC2 infrastructure destroyed successfully"
+            echo "ℹ️ Golden AMIs are preserved"
+          '''
+        }
+      }
     }
-  }
-}
+
+  }   // closes stages
+}     // closes pipeline
