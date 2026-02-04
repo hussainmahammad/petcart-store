@@ -1,16 +1,23 @@
-output "public_ip" {
-  value = aws_instance.petcart.public_ip
+# ----------------------------
+# Application URL
+# ----------------------------
+output "alb_dns_name" {
+  description = "Public URL of PetCart application"
+  value       = aws_lb.petcart_alb.dns_name
 }
 
-output "instance_id" {
-  value = aws_instance.petcart.id
+# ----------------------------
+# Auto Scaling Group name
+# ----------------------------
+output "asg_name" {
+  description = "Auto Scaling Group name"
+  value       = aws_autoscaling_group.petcart_asg.name
 }
 
-output "nginx_access_log_group" {
-  value = "/petcart/nginx/access"
+# ----------------------------
+# Target Group ARN (optional, useful)
+# ----------------------------
+output "target_group_arn" {
+  description = "Target group ARN used by ALB"
+  value       = aws_lb_target_group.petcart_tg.arn
 }
-
-output "nginx_error_log_group" {
-  value = "/petcart/nginx/error"
-}
-
