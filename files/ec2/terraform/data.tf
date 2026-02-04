@@ -7,11 +7,17 @@ data "aws_vpc" "default" {
 
 # ----------------------------
 # Discover public subnets
+# (FORCE us-east-1a ONLY)
 # ----------------------------
 data "aws_subnets" "public" {
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
+  }
+
+  filter {
+    name   = "availability-zone"
+    values = ["us-east-1a"]
   }
 }
 
