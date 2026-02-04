@@ -6,6 +6,15 @@
     frontend_src: "/tmp/dist"
 
   tasks:
+
+    # ===============================
+    # REQUIRED FOR AMAZON LINUX 2
+    # ===============================
+    - name: Enable nginx via amazon-linux-extras
+      command: amazon-linux-extras enable nginx1
+      args:
+        creates: /etc/yum.repos.d/nginx.repo
+
     - name: Install nginx
       yum:
         name: nginx
@@ -44,6 +53,7 @@
         owner: root
         group: root
         mode: "0755"
+        remote_src: yes
 
     - name: Validate nginx configuration
       command: nginx -t
