@@ -42,9 +42,7 @@ build {
   name    = "petcart-golden-ami"
   sources = ["source.amazon-ebs.petcart"]
 
-  # -------------------------------------------------
-  # Ensure SSH + SFTP are available for Ansible
-  # -------------------------------------------------
+  # Ensure SSH is running
   provisioner "shell" {
     inline = [
       "sudo yum update -y",
@@ -54,23 +52,23 @@ build {
     ]
   }
 
-  # -------------------------------------------------
   # Copy frontend build into the temp EC2
-  # -------------------------------------------------
   provisioner "file" {
     source      = "../../../app/dist"
     destination = "/tmp/dist"
   }
 
-  # -------------------------------------------------
   # Run Ansible to configure nginx + app
-  # -------------------------------------------------
   provisioner "ansible" {
     playbook_file = "../ansible/deploy.yml"
 
     extra_arguments = [
       "--extra-vars",
       "frontend_src=/tmp/dist"
+    ]
+
+    ansible_env_vars = [
+      "ANSIBLE_SCP_IF_SSH=True"
     ]
   }
 }
