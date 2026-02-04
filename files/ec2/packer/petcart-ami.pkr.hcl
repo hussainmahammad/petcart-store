@@ -42,33 +42,42 @@ build {
   name    = "petcart-golden-ami"
   sources = ["source.amazon-ebs.petcart"]
 
-  # Ensure SSH is running
+  # -------------------------------------------------
+  # FIX SSHD SFTP PATH (CRITICAL)
+  # -------------------------------------------------
   provisioner "shell" {
     inline = [
       "sudo yum update -y",
       "sudo yum install -y openssh-server openssh-clients",
+
+      # Ensure correct SFTP subsystem path
+      "sudo sed -i 's|^Subsystem sftp .*|Subsystem sftp /usr/libexec/openssh/sftp-server|' /etc/ssh/sshd_config",
+
       "sudo systemctl enable sshd",
-      "sudo systemctl start sshd"
+      "sudo systemctl restart sshd",
+
+      # sanity check (optional but useful)
+      "ls -l /usr/libexec/openssh/sftp-server"
     ]
   }
 
+  # -------------------------------------------------
   # Copy frontend build into the temp EC2
+  # -------------------------------------------------
   provisioner "file" {
     source      = "../../../app/dist"
     destination = "/tmp/dist"
   }
 
+  # -------------------------------------------------
   # Run Ansible to configure nginx + app
+  # -------------------------------------------------
   provisioner "ansible" {
     playbook_file = "../ansible/deploy.yml"
 
     extra_arguments = [
       "--extra-vars",
       "frontend_src=/tmp/dist"
-    ]
-
-    ansible_env_vars = [
-      "ANSIBLE_SCP_IF_SSH=True"
     ]
   }
 }
