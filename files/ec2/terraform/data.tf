@@ -7,7 +7,7 @@ data "aws_vpc" "default" {
 
 # ----------------------------
 # Discover public subnets
-# (FORCE us-east-1a ONLY)
+# (us-east-1a + us-east-1b REQUIRED for ALB)
 # ----------------------------
 data "aws_subnets" "public" {
   filter {
@@ -17,7 +17,10 @@ data "aws_subnets" "public" {
 
   filter {
     name   = "availability-zone"
-    values = ["us-east-1a"]
+    values = [
+      "us-east-1a",
+      "us-east-1b"
+    ]
   }
 }
 
