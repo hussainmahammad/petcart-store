@@ -29,7 +29,7 @@ source "amazon-ebs" "petcart" {
 
   source_ami_filter {
     filters = {
-      name                = "al2023-ami-*-x86_64"
+      name                = "amzn2-ami-hvm-*-x86_64-gp2"
       virtualization-type = "hvm"
       root-device-type    = "ebs"
     }
@@ -42,19 +42,20 @@ build {
   name    = "petcart-golden-ami"
   sources = ["source.amazon-ebs.petcart"]
 
-  # Copy frontend build
+  # Copy frontend build into the temp EC2
   provisioner "file" {
     source      = "../../../app/dist"
     destination = "/tmp/dist"
   }
 
-  # Run Ansible (WILL WORK on AL2023)
+  # Run Ansible to configure nginx + app
+  # IMPORTANT: force SCP (disable SFTP) for Amazon Linux 2
   provisioner "ansible" {
     playbook_file = "../ansible/deploy.yml"
 
     extra_arguments = [
-      "--extra-vars",
-      "frontend_src=/tmp/dist"
+      "--extra-vars", "frontend_src=/tmp/dist",
+      "--scp-extra-args", "'-O'"
     ]
   }
 }
