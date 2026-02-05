@@ -18,12 +18,14 @@ pipeline {
 
   stages {
 
-    /* =====================
-       PREPARE
-       ===================== */
     stage('Prepare') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('Build') {
+      steps {
         sh '''
           chmod +x files/eks-fargate/scripts/*.sh || true
           chmod +x files/eks-ec2/scripts/*.sh || true
@@ -31,20 +33,58 @@ pipeline {
       }
     }
 
-    /* =====================
-       SETUP (INFRA)
-       ===================== */
+    /* =======================
+       SETUP
+       ======================= */
     stage('Setup') {
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
-          script {
+        script {
 
-            if (params.DEPLOY_TARGET == 'eks-fargate') {
+          /* ---------- EC2 ---------- */
+          if (params.DEPLOY_TARGET == 'ec2') {
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
               sh '''
                 set -e
+
+                echo "=============================="
+                echo "Building frontend"
+                echo "=============================="
+                cd app
+                npm install
+                chmod +x node_modules/.bin/vite
+                npm run build
+                cd ..
+              '''
+            }
+          }
+
+          /* ---------- EKS FARGATE ---------- */
+          if (params.DEPLOY_TARGET == 'eks-fargate') {
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
+              sh '''
+                set -e
+
+                ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+                aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
+                  || aws ecr create-repository --repository-name ${ECR_REPO}
+
+                aws ecr get-login-password --region ${AWS_REGION} \
+                  | docker login --username AWS --password-stdin \
+                    ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+                docker build -t ${ECR_REPO}:latest -f files/eks-fargate/docker/Dockerfile .
+                docker tag ${ECR_REPO}:latest \
+                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+                docker push \
+                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
                 eksctl create cluster -f files/eks-fargate/eksctl/cluster-fargate.yaml || true
 
                 aws eks update-kubeconfig \
@@ -63,10 +103,32 @@ pipeline {
                 kubectl apply -f files/eks-fargate/k8s/aws-logging-configmap.yaml
               '''
             }
+          }
 
-            if (params.DEPLOY_TARGET == 'eks-ec2') {
+          /* ---------- EKS EC2 (ADDED) ---------- */
+          if (params.DEPLOY_TARGET == 'eks-ec2') {
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
               sh '''
                 set -e
+
+                ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+                aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
+                  || aws ecr create-repository --repository-name ${ECR_REPO}
+
+                aws ecr get-login-password --region ${AWS_REGION} \
+                  | docker login --username AWS --password-stdin \
+                    ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+                docker build -t ${ECR_REPO}:latest -f files/eks-ec2/docker/Dockerfile .
+                docker tag ${ECR_REPO}:latest \
+                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+                docker push \
+                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
                 eksctl create cluster -f files/eks-ec2/eksctl/cluster-nodegroup.yaml || true
 
                 aws eks update-kubeconfig \
@@ -101,123 +163,157 @@ pipeline {
                   || echo "CloudWatch add-on already installed"
               '''
             }
+          }
 
-            if (params.DEPLOY_TARGET == 'ec2') {
+        }
+      }
+    }
+
+    /* =======================
+       DEPLOY
+       ======================= */
+    stage('Deploy') {
+      steps {
+        script {
+
+          /* ---------- EC2 ---------- */
+          if (params.DEPLOY_TARGET == 'ec2') {
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
               sh '''
                 set -e
+
+                echo "=============================="
+                echo "Building Golden AMI with Packer"
+                echo "=============================="
                 cd files/ec2/packer
                 packer init .
                 packer build petcart-ami.pkr.hcl
                 cd ../../..
 
+                echo "=============================="
+                echo "Deploying infrastructure with Terraform"
+                echo "=============================="
                 cd files/ec2/terraform
                 terraform init
                 terraform apply -auto-approve
               '''
             }
           }
+
+          /* ---------- EKS FARGATE ---------- */
+          if (params.DEPLOY_TARGET == 'eks-fargate') {
+            sh '''
+              kubectl apply -f files/eks-fargate/k8s/namespace.yaml
+              kubectl apply -f files/eks-fargate/k8s/deployment.yaml
+              kubectl apply -f files/eks-fargate/k8s/service.yaml
+              kubectl apply -f files/eks-fargate/k8s/ingress.yaml
+            '''
+          }
+
+          /* ---------- EKS EC2 (ADDED) ---------- */
+          if (params.DEPLOY_TARGET == 'eks-ec2') {
+            sh '''
+              kubectl apply -f files/eks-ec2/k8s/namespace.yaml
+              kubectl apply -f files/eks-ec2/k8s/deployment.yaml
+              kubectl apply -f files/eks-ec2/k8s/service.yaml
+              kubectl apply -f files/eks-ec2/k8s/ingress.yaml
+            '''
+          }
+
         }
       }
     }
 
-    /* =====================
-       DEPLOY (APP)
-       ===================== */
-    stage('Deploy') {
+    /* =======================
+       VALIDATE
+       ======================= */
+    stage('Validate') {
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding',
-           credentialsId: 'account-c-aws']
-        ]) {
-          script {
+        script {
 
-            if (params.DEPLOY_TARGET != 'ec2') {
+          /* ---------- EC2 ---------- */
+          if (params.DEPLOY_TARGET == 'ec2') {
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
               sh '''
                 set -e
-                ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-                aws ecr describe-repositories --repository-names ${ECR_REPO} >/dev/null 2>&1 \
-                  || aws ecr create-repository --repository-name ${ECR_REPO}
+                echo "=============================="
+                echo "Fetching ALB URL"
+                echo "=============================="
+                ALB_URL=$(terraform output -raw alb_dns_name)
 
-                aws ecr get-login-password --region ${AWS_REGION} \
-                  | docker login --username AWS --password-stdin \
-                    ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-              '''
-            }
-
-            if (params.DEPLOY_TARGET == 'eks-fargate') {
-              sh '''
-                docker build -t ${ECR_REPO}:latest -f files/eks-fargate/docker/Dockerfile .
-                docker tag ${ECR_REPO}:latest \
-                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
-                docker push \
-                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
-
-                kubectl apply -f files/eks-fargate/k8s/namespace.yaml
-                kubectl apply -f files/eks-fargate/k8s/deployment.yaml
-                kubectl apply -f files/eks-fargate/k8s/service.yaml
-                kubectl apply -f files/eks-fargate/k8s/ingress.yaml
-              '''
-            }
-
-            if (params.DEPLOY_TARGET == 'eks-ec2') {
-              sh '''
-                docker build -t ${ECR_REPO}:latest -f files/eks-ec2/docker/Dockerfile .
-                docker tag ${ECR_REPO}:latest \
-                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
-                docker push \
-                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
-
-                kubectl apply -f files/eks-ec2/k8s/namespace.yaml
-                kubectl apply -f files/eks-ec2/k8s/deployment.yaml
-                kubectl apply -f files/eks-ec2/k8s/service.yaml
-                kubectl apply -f files/eks-ec2/k8s/ingress.yaml
+                echo ""
+                echo "🚀 EC2 Application is LIVE"
+                echo "👉 http://${ALB_URL}"
               '''
             }
           }
+
+          /* ---------- EKS FARGATE ---------- */
+          if (params.DEPLOY_TARGET == 'eks-fargate') {
+            sh '''
+              echo "Waiting for ALB DNS (Fargate)..."
+              ALB_URL=""
+              for i in {1..60}; do
+                ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+                [ -n "$ALB_URL" ] && break
+                sleep 10
+              done
+
+              if [ -z "$ALB_URL" ]; then
+                echo "ERROR: ALB not created"
+                exit 1
+              fi
+
+              for i in {1..60}; do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+                [ "$HTTP_CODE" = "200" ] && exit 0
+                sleep 10
+              done
+
+              exit 1
+            '''
+          }
+
+          /* ---------- EKS EC2 (ADDED) ---------- */
+          if (params.DEPLOY_TARGET == 'eks-ec2') {
+            sh '''
+              ALB_URL=""
+              for i in {1..60}; do
+                ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+                [ -n "$ALB_URL" ] && break
+                sleep 10
+              done
+
+              [ -z "$ALB_URL" ] && exit 1
+
+              for i in {1..60}; do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+                [ "$HTTP_CODE" = "200" ] && exit 0
+                sleep 10
+              done
+
+              exit 1
+            '''
+          }
+
         }
       }
     }
 
-    /* =====================
-       VALIDATE
-       ===================== */
-    stage('Validate') {
-      steps {
-        sh '''
-          echo "Validating deployment..."
-
-          if [ "${DEPLOY_TARGET}" = "ec2" ]; then
-            ALB_URL=$(terraform output -raw alb_dns_name)
-          else
-            for i in {1..60}; do
-              ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
-                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-              [ -n "$ALB_URL" ] && break
-              sleep 10
-            done
-          fi
-
-          [ -z "$ALB_URL" ] && exit 1
-
-          for i in {1..60}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-            [ "$HTTP_CODE" = "200" ] && exit 0
-            sleep 10
-          done
-
-          exit 1
-        '''
-      }
-    }
-
-    /* =====================
-       COMPLETE
-       ===================== */
     stage('Complete') {
       steps {
-        echo "Deployment completed successfully"
+        // always run
       }
     }
+
   }
 }
