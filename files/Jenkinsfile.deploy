@@ -311,7 +311,7 @@ pipeline {
 
     stage('Complete') {
       steps {
-        // always run
+        sh 'true'
       }
     }
 
