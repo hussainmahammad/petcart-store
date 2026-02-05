@@ -17,17 +17,17 @@ pipeline {
 
   stages {
 
-    stage('Checkout Repo') {
+    /* ---------------- COMPLETE ---------------- */
+    stage('Complete') {
       steps {
         checkout scm
       }
     }
 
     /* ==================================================
-       EKS – FARGATE DESTROY (FULL WIPEOUT)
-       (UNCHANGED)
+       VALIDATE  (was Destroy EKS Fargate)
        ================================================== */
-    stage('Destroy EKS (Fargate)') {
+    stage('Validate') {
       when {
         expression { params.DESTROY_TARGET == 'eks-fargate' }
       }
@@ -73,10 +73,9 @@ pipeline {
     }
 
     /* ==================================================
-       EKS – EC2 NODE GROUP DESTROY (FULL WIPEOUT)
-       (FIXED)
+       DEPLOY  (was Destroy EKS EC2 Node Group)
        ================================================== */
-    stage('Destroy EKS (EC2 Node Group)') {
+    stage('Deploy') {
       when {
         expression { params.DESTROY_TARGET == 'eks-ec2' }
       }
@@ -93,18 +92,12 @@ pipeline {
 
             aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME} || true
 
-            # --------------------
-            # App resources
-            # --------------------
             kubectl delete ingress petcart-ingress -n ${NAMESPACE} --ignore-not-found
             sleep 60
             kubectl delete svc petcart-service -n ${NAMESPACE} --ignore-not-found
             kubectl delete deployment petcart-deployment -n ${NAMESPACE} --ignore-not-found
             kubectl delete ns ${NAMESPACE} --ignore-not-found
 
-            # --------------------
-            # ALB Controller
-            # --------------------
             helm uninstall aws-load-balancer-controller -n kube-system || true
 
             eksctl delete iamserviceaccount \
@@ -113,9 +106,6 @@ pipeline {
               --namespace kube-system \
               --name aws-load-balancer-controller || true
 
-            # --------------------
-            # CloudWatch Observability
-            # --------------------
             aws eks delete-addon \
               --cluster-name ${CLUSTER_NAME} \
               --addon-name amazon-cloudwatch-observability \
@@ -127,14 +117,8 @@ pipeline {
               --namespace amazon-cloudwatch \
               --name cloudwatch-agent || true
 
-            # --------------------
-            # Delete EKS cluster
-            # --------------------
             eksctl delete cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} || true
 
-            # --------------------
-            # CloudWatch log groups
-            # --------------------
             aws logs describe-log-groups \
               --log-group-name-prefix /aws/containerinsights/${CLUSTER_NAME} \
               --region ${AWS_REGION} \
@@ -145,9 +129,6 @@ pipeline {
                   --region ${AWS_REGION} || true
               done
 
-            # --------------------
-            # IAM policy cleanup (EC2 ALB Controller)
-            # --------------------
             aws iam delete-policy \
               --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicyEC2 || true
 
@@ -158,9 +139,9 @@ pipeline {
     }
 
     /* =======================
-       EC2 – DESTROY (ASG + ALB)
+       SETUP  (was Destroy EC2)
        ======================= */
-    stage('Destroy EC2 (ASG + ALB)') {
+    stage('Setup') {
       when {
         expression { params.DESTROY_TARGET == 'ec2' }
       }
@@ -189,5 +170,5 @@ pipeline {
       }
     }
 
-  }   // closes stages
-}     // closes pipeline
+  }
+}
