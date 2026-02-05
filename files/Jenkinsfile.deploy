@@ -246,7 +246,8 @@ pipeline {
                 echo "=============================="
                 echo "Fetching ALB URL"
                 echo "=============================="
-                ALB_URL=$(terraform output -raw alb_dns_name)
+				cd files/ec2/terraform
+				ALB_URL=$(terraform output -raw alb_dns_name)
 
                 echo ""
                 echo "🚀 EC2 Application is LIVE"
