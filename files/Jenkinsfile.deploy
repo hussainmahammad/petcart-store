@@ -105,7 +105,7 @@ pipeline {
             }
           }
 
-          /* ---------- EKS EC2 (ADDED) ---------- */
+          /* ---------- EKS EC2 ---------- */
           if (params.DEPLOY_TARGET == 'eks-ec2') {
             withCredentials([
               [$class: 'AmazonWebServicesCredentialsBinding',
@@ -205,22 +205,32 @@ pipeline {
 
           /* ---------- EKS FARGATE ---------- */
           if (params.DEPLOY_TARGET == 'eks-fargate') {
-            sh '''
-              kubectl apply -f files/eks-fargate/k8s/namespace.yaml
-              kubectl apply -f files/eks-fargate/k8s/deployment.yaml
-              kubectl apply -f files/eks-fargate/k8s/service.yaml
-              kubectl apply -f files/eks-fargate/k8s/ingress.yaml
-            '''
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
+              sh '''
+                kubectl apply -f files/eks-fargate/k8s/namespace.yaml
+                kubectl apply -f files/eks-fargate/k8s/deployment.yaml
+                kubectl apply -f files/eks-fargate/k8s/service.yaml
+                kubectl apply -f files/eks-fargate/k8s/ingress.yaml
+              '''
+            }
           }
 
-          /* ---------- EKS EC2 (ADDED) ---------- */
+          /* ---------- EKS EC2 ---------- */
           if (params.DEPLOY_TARGET == 'eks-ec2') {
-            sh '''
-              kubectl apply -f files/eks-ec2/k8s/namespace.yaml
-              kubectl apply -f files/eks-ec2/k8s/deployment.yaml
-              kubectl apply -f files/eks-ec2/k8s/service.yaml
-              kubectl apply -f files/eks-ec2/k8s/ingress.yaml
-            '''
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
+              sh '''
+                kubectl apply -f files/eks-ec2/k8s/namespace.yaml
+                kubectl apply -f files/eks-ec2/k8s/deployment.yaml
+                kubectl apply -f files/eks-ec2/k8s/service.yaml
+                kubectl apply -f files/eks-ec2/k8s/ingress.yaml
+              '''
+            }
           }
 
         }
@@ -246,64 +256,86 @@ pipeline {
                 echo "=============================="
                 echo "Fetching ALB URL"
                 echo "=============================="
-				cd files/ec2/terraform
-				ALB_URL=$(terraform output -raw alb_dns_name)
 
-                echo ""
-                echo "🚀 EC2 Application is LIVE"
-                echo "👉 http://${ALB_URL}"
+                cd files/ec2/terraform
+                ALB_URL=$(terraform output -raw alb_dns_name)
+
+                echo "ALB URL: http://${ALB_URL}"
+                echo "Waiting for HTTP 200..."
+
+                for i in {1..60}; do
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${ALB_URL} || true)
+                  if [ "$HTTP_CODE" = "200" ]; then
+                    echo "🚀 EC2 Application is LIVE"
+                    echo "👉 http://${ALB_URL}"
+                    exit 0
+                  fi
+                  sleep 10
+                done
+
+                echo "ERROR: EC2 app did not return HTTP 200"
+                exit 1
               '''
             }
           }
 
           /* ---------- EKS FARGATE ---------- */
           if (params.DEPLOY_TARGET == 'eks-fargate') {
-            sh '''
-              echo "Waiting for ALB DNS (Fargate)..."
-              ALB_URL=""
-              for i in {1..60}; do
-                ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
-                  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-                [ -n "$ALB_URL" ] && break
-                sleep 10
-              done
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
+              sh '''
+                echo "Waiting for ALB DNS (Fargate)..."
+                ALB_URL=""
 
-              if [ -z "$ALB_URL" ]; then
-                echo "ERROR: ALB not created"
+                for i in {1..60}; do
+                  ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+                  [ -n "$ALB_URL" ] && break
+                  sleep 10
+                done
+
+                [ -z "$ALB_URL" ] && exit 1
+
+                for i in {1..60}; do
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+                  [ "$HTTP_CODE" = "200" ] && exit 0
+                  sleep 10
+                done
+
                 exit 1
-              fi
-
-              for i in {1..60}; do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-                [ "$HTTP_CODE" = "200" ] && exit 0
-                sleep 10
-              done
-
-              exit 1
-            '''
+              '''
+            }
           }
 
-          /* ---------- EKS EC2 (ADDED) ---------- */
+          /* ---------- EKS EC2 ---------- */
           if (params.DEPLOY_TARGET == 'eks-ec2') {
-            sh '''
-              ALB_URL=""
-              for i in {1..60}; do
-                ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
-                  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-                [ -n "$ALB_URL" ] && break
-                sleep 10
-              done
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding',
+               credentialsId: 'account-c-aws']
+            ]) {
+              sh '''
+                ALB_URL=""
 
-              [ -z "$ALB_URL" ] && exit 1
+                for i in {1..60}; do
+                  ALB_URL=$(kubectl get ingress petcart-ingress -n ${NAMESPACE} \
+                    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+                  [ -n "$ALB_URL" ] && break
+                  sleep 10
+                done
 
-              for i in {1..60}; do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-                [ "$HTTP_CODE" = "200" ] && exit 0
-                sleep 10
-              done
+                [ -z "$ALB_URL" ] && exit 1
 
-              exit 1
-            '''
+                for i in {1..60}; do
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
+                  [ "$HTTP_CODE" = "200" ] && exit 0
+                  sleep 10
+                done
+
+                exit 1
+              '''
+            }
           }
 
         }
