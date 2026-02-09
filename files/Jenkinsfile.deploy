@@ -6,6 +6,10 @@ pipeline {
     CLUSTER_NAME = "petcart-eks"
     NAMESPACE    = "petcart"
     ECR_REPO     = "petcart"
+
+    # EC2 CloudWatch log groups (fixed)
+    EC2_ACCESS_LOG_GROUP = "/petcart/nginx/access"
+    EC2_ERROR_LOG_GROUP  = "/petcart/nginx/error"
   }
 
   parameters {
@@ -267,7 +271,22 @@ pipeline {
                   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${ALB_URL} || true)
                   if [ "$HTTP_CODE" = "200" ]; then
                     echo "🚀 EC2 Application is LIVE"
-                    echo "APP_URL=http://${ALB_URL}"
+
+                    ASG_NAME=$(terraform output -raw asg_name)
+
+                    echo "===OBS_START==="
+                    echo "OBS_RUNTIME=ec2"
+                    echo "OBS_ENDPOINT=http://${ALB_URL}"
+                    echo "OBS_LOG_GROUP_ACCESS=${EC2_ACCESS_LOG_GROUP}"
+                    echo "OBS_LOG_GROUP_ERROR=${EC2_ERROR_LOG_GROUP}"
+                    echo "OBS_METRICS_ENABLED=true"
+                    echo "OBS_METRICS_TYPE=ec2"
+                    echo "OBS_ASG=${ASG_NAME}"
+                    echo "OBS_CLUSTER=NA"
+                    echo "OBS_NAMESPACE=NA"
+                    echo "OBS_DEPLOYMENT=NA"
+                    echo "===OBS_END==="
+
                     exit 0
                   fi
                   sleep 10
@@ -300,7 +319,26 @@ pipeline {
 
                 for i in {1..60}; do
                   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-                  [ "$HTTP_CODE" = "200" ] && exit 0
+                  if [ "$HTTP_CODE" = "200" ]; then
+                    echo "🚀 EKS Fargate Application is LIVE"
+
+                    LOG_GROUP="/aws/containerinsights/${CLUSTER_NAME}/application"
+
+                    echo "===OBS_START==="
+                    echo "OBS_RUNTIME=eks-fargate"
+                    echo "OBS_ENDPOINT=http://${ALB_URL}"
+                    echo "OBS_LOG_GROUP=${LOG_GROUP}"
+                    echo "OBS_METRICS_ENABLED=true"
+                    echo "OBS_METRICS_TYPE=eks"
+                    echo "OBS_CLUSTER=${CLUSTER_NAME}"
+                    echo "OBS_NAMESPACE=${NAMESPACE}"
+                    echo "OBS_DEPLOYMENT=petcart"
+                    echo "OBS_ASG=NA"
+                    echo "===OBS_END==="
+
+                    exit 0
+                  fi
+
                   sleep 10
                 done
 
@@ -329,7 +367,26 @@ pipeline {
 
                 for i in {1..60}; do
                   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_URL || true)
-                  [ "$HTTP_CODE" = "200" ] && exit 0
+                  if [ "$HTTP_CODE" = "200" ]; then
+                    echo "🚀 EKS EC2 Application is LIVE"
+
+                    LOG_GROUP="/aws/containerinsights/${CLUSTER_NAME}/application"
+
+                    echo "===OBS_START==="
+                    echo "OBS_RUNTIME=eks-ec2"
+                    echo "OBS_ENDPOINT=http://${ALB_URL}"
+                    echo "OBS_LOG_GROUP=${LOG_GROUP}"
+                    echo "OBS_METRICS_ENABLED=true"
+                    echo "OBS_METRICS_TYPE=eks"
+                    echo "OBS_CLUSTER=${CLUSTER_NAME}"
+                    echo "OBS_NAMESPACE=${NAMESPACE}"
+                    echo "OBS_DEPLOYMENT=petcart"
+                    echo "OBS_ASG=NA"
+                    echo "===OBS_END==="
+
+                    exit 0
+                  fi
+
                   sleep 10
                 done
 
