@@ -7,7 +7,7 @@ pipeline {
     NAMESPACE    = "petcart"
     ECR_REPO     = "petcart"
 
-    # EC2 CloudWatch log groups (fixed)
+    /* EC2 CloudWatch log groups (fixed) */
     EC2_ACCESS_LOG_GROUP = "/petcart/nginx/access"
     EC2_ERROR_LOG_GROUP  = "/petcart/nginx/error"
   }
