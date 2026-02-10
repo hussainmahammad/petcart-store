@@ -332,7 +332,7 @@ pipeline {
                   if [ "$HTTP_CODE" = "200" ]; then
                     echo "🚀 EKS Fargate Application is LIVE"
 
-                    LOG_GROUP="/aws/containerinsights/${CLUSTER_NAME}/application"
+                    LOG_GROUP="/eks/petcart/nginx"
 
                     echo "===OBS_START==="
                     echo "OBS_RUNTIME=eks-fargate"
