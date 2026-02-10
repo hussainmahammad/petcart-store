@@ -89,7 +89,17 @@ pipeline {
                 docker push \
                   ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
 
-                eksctl create cluster -f files/eks-fargate/eksctl/cluster-fargate.yaml || true
+                eksctl delete cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} || true
+				echo "Waiting for cluster deletion to complete..."
+				while aws eks describe-cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} >/dev/null 2>&1; do
+					echo "Cluster still deleting..."
+				sleep 30
+				done
+				
+				echo "Cluster deleted. Creating fresh cluster..."
+				
+				
+				eksctl create cluster -f files/eks-fargate/eksctl/cluster-fargate.yaml
 
                 aws eks update-kubeconfig \
                   --region ${AWS_REGION} \
