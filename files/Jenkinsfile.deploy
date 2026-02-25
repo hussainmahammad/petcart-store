@@ -220,7 +220,7 @@ pipeline {
                 echo "Deploying infrastructure with Terraform"
                 echo "=============================="
                 cd files/ec2/terraform
-                terraform init
+                terraform init -reconfigure
                 terraform apply -auto-approve
               '''
             }
