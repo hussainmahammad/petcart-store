@@ -1,19 +1,45 @@
-# PetCart Store
+# 🐾 PetCart Store – Production-Grade DevOps Deployment
 
-This project demonstrates deployment of PetCart application using:
+## 📌 Project Overview
 
-- EC2
-- EKS (EC2 mode)
-- EKS (Fargate mode)
-- Jenkins CI/CD
+PetCart Store is a frontend e-commerce application deployed using **three different production-grade infrastructure strategies on AWS**:
 
-## Deployment Options
+1. **EC2 + Auto Scaling + ALB** (Traditional Infrastructure)
+2. **EKS with EC2 Worker Nodes** (Managed Kubernetes)
+3. **EKS with Fargate** (Serverless Kubernetes)
 
-- files/ec2 → Manual EC2 deployment
-- files/eks-ec2 → Kubernetes on EC2 worker nodes
-- files/eks-fargate → Serverless Kubernetes using Fargate
+This project demonstrates real-world DevOps practices including:
 
-## CI/CD
+- Jenkins CI/CD automation
+- Infrastructure as Code (Terraform)
+- Immutable Infrastructure (Packer + Ansible)
+- Containerization (Docker + ECR)
+- Kubernetes (EKS)
+- AWS Load Balancer Controller
+- Auto Scaling policies
+- CloudWatch Logs & Metrics
+- Full lifecycle automation (Deploy + Destroy)
 
-- Jenkinsfile.deploy → Deploy pipeline
-- Jenkinsfile.destroy → Destroy infrastructure
+---
+
+# 🏗 Architecture Overview
+
+---
+
+# 1️⃣ EC2 Deployment – Traditional + Immutable Infrastructure
+
+## 🔹 Architecture Flow
+
+Frontend  
+→ Golden AMI (Packer + Ansible)  
+→ Launch Template  
+→ Auto Scaling Group  
+→ Application Load Balancer  
+→ Public Internet  
+→ CloudWatch Logs & Metrics  
+
+---
+
+## 📸 Architecture Diagram
+
+<img width="1919" height="802" alt="image" src="https://github.com/user-attachments/assets/8ddd31fd-6f8b-4f8a-a7af-cad7c7c7ae59" />
