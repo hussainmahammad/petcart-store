@@ -1,4 +1,4 @@
-# 🐾 PetCart Store – Production-Grade DevOps Deployment
+        # 🐾 PetCart Store – Production-Grade DevOps Deployment
 
 ## 📌 Project Overview
 
@@ -42,4 +42,3 @@ Frontend
 
 ## 📸 Architecture Diagram
 
-<img width="1919" height="802" alt="image" src="https://github.com/user-attachments/assets/8ddd31fd-6f8b-4f8a-a7af-cad7c7c7ae59" />
