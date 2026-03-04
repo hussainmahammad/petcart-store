@@ -1,6 +1,6 @@
 # 1️⃣ EC2 Deployment – Traditional + Immutable Infrastructure
 
-## 🔹 Architecture Flow
+## Architecture Flow
 
 Frontend  
 → Golden AMI (Packer + Ansible)  
@@ -12,12 +12,12 @@ Frontend
 
 ---
 
-## 📸 Architecture Diagram
+##  Architecture Diagram
 [ Add EC2 Architecture Diagram Screenshot Here ]
 
 ---
 
-## 🔹 Detailed Deployment Flow
+##  Detailed Deployment Flow
 
 ### Step 1 – Frontend Build (CI Stage)
 
@@ -54,7 +54,7 @@ This ensures:
 
 ---
 
-## 📸 Packer Build Logs
+## Packer Build Logs
 [ Add Packer Build Screenshot Here ]
 
 ---
@@ -103,12 +103,6 @@ CloudWatch alarms trigger scaling policies automatically.
 - `/var/log/nginx/access.log` → CloudWatch
 - `/var/log/nginx/error.log` → CloudWatch
 - CPU metrics collected every 60 seconds
-- ASG metrics monitored
-
-This ensures full visibility of:
-- Application traffic
-- Errors
-- Scaling behavior
 
 ---
 
