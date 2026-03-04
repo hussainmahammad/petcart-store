@@ -76,7 +76,7 @@ Infrastructure state is stored securely in S3.
 
 ---
 
-## 📸 Terraform Apply Output
+## Terraform Apply Output
 [ Add Terraform Apply Screenshot Here ]
 
 ---
@@ -93,7 +93,7 @@ CloudWatch alarms trigger scaling policies automatically.
 
 ---
 
-## 📸 CloudWatch Scaling Alarm
+## CloudWatch Scaling Alarm
 [ Add CloudWatch Alarm Screenshot Here ]
 
 ---
@@ -106,7 +106,7 @@ CloudWatch alarms trigger scaling policies automatically.
 
 ---
 
-## 📸 EC2 CloudWatch Logs
+## EC2 CloudWatch Logs
 [ Add EC2 Logs Screenshot Here ]
 
 ---
