@@ -121,7 +121,7 @@ CloudWatch alarms trigger scaling policies automatically.
 
 ## Access and Error Logs from Logs Console
 
-![Uploading image.png…]()
+<img width="1116" height="781" alt="image" src="https://github.com/user-attachments/assets/2e389851-94a5-48d9-8f05-aa5f05a0b0bf" />
 
 
 ---
