@@ -166,7 +166,7 @@ pipeline {
 
                 cd files/ec2/terraform
 
-                terraform init
+                terraform init -reconfigure
                 terraform destroy -auto-approve
 
                 echo ""
