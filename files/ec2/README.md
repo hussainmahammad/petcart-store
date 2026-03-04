@@ -82,7 +82,7 @@ Infrastructure state is stored securely in S3.
 
 ## Terraform Apply Output
 
-<img width="1166" height="607" alt="image" src="https://github.com/user-attachments/assets/77b71573-3887-4781-87ba-ad17b0f736cb" />
+<img width="1166" height="613" alt="image" src="https://github.com/user-attachments/assets/9fabc962-cb70-40f1-bb56-7e099fcdfd26" />
 
 ---
 
@@ -99,7 +99,8 @@ CloudWatch alarms trigger scaling policies automatically.
 ---
 
 ## CloudWatch Scaling Alarm
-[ Add CloudWatch Alarm Screenshot Here ]
+
+<img width="1166" height="272" alt="image" src="https://github.com/user-attachments/assets/c0787cfe-5433-4362-b190-d01309690742" />
 
 ---
 
@@ -112,6 +113,8 @@ CloudWatch alarms trigger scaling policies automatically.
 ---
 
 ## EC2 CloudWatch Logs
-[ Add EC2 Logs Screenshot Here ]
+
+<img width="1166" height="205" alt="image" src="https://github.com/user-attachments/assets/b0ccd843-f5ca-48c1-9a18-bac25f08fab9" />
+<img width="1116" height="938" alt="image" src="https://github.com/user-attachments/assets/a403d781-3098-4488-8686-6bda33c5f7e8" />
 
 ---
