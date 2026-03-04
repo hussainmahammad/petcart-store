@@ -59,6 +59,8 @@ This ensures:
 
 <img width="1166" height="792" alt="image" src="https://github.com/user-attachments/assets/dfb90a52-936d-484d-adb1-f2caf37a13e7" />
 
+## Petcart AMI
+
 <img width="1166" height="134" alt="image" src="https://github.com/user-attachments/assets/c2830c46-711d-45d1-9f5f-0c8d350062d3" />
 
 ---
@@ -112,9 +114,12 @@ CloudWatch alarms trigger scaling policies automatically.
 
 ---
 
-## EC2 CloudWatch Logs
+## EC2 CloudWatch Log Groups
 
 <img width="1166" height="205" alt="image" src="https://github.com/user-attachments/assets/b0ccd843-f5ca-48c1-9a18-bac25f08fab9" />
+
+## Access and Error Logs from Logs Console
+
 <img width="1116" height="938" alt="image" src="https://github.com/user-attachments/assets/a403d781-3098-4488-8686-6bda33c5f7e8" />
 
 ---
