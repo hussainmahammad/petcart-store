@@ -22,7 +22,7 @@ The **AWS Load Balancer Controller** dynamically provisions an **Application Loa
 
 ## 📸 EKS EC2 Architecture Diagram
 
-![EKS EC2 Architecture](screenshots/eks-ec2-architecture.png)
+<img width="1278" height="768" alt="ec2_eks" src="https://github.com/user-attachments/assets/dc25c1a7-5ad2-40fd-812c-82b0be1e5007" />
 
 ---
 
@@ -72,7 +72,7 @@ Kubernetes Deployment
 
 ## 📸 ECR Repository Screenshot
 
-![ECR Repository](screenshots/ecr-repository.png)
+<img width="1543" height="152" alt="image" src="https://github.com/user-attachments/assets/a5d95f93-cbed-49ab-87b7-2cedd1fd4d73" />
 
 ---
 
