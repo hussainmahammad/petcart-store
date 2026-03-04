@@ -13,7 +13,8 @@ Frontend
 ---
 
 ##  Architecture Diagram
-[ Add EC2 Architecture Diagram Screenshot Here ]
+
+<img width="1536" height="853" alt="Ec2_Architecture" src="https://github.com/user-attachments/assets/e39480c2-926e-423a-a32a-d0ce251479be" />
 
 ---
 
