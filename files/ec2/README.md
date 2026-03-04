@@ -56,7 +56,10 @@ This ensures:
 ---
 
 ## Packer Build Logs
-[ Add Packer Build Screenshot Here ]
+
+<img width="1166" height="792" alt="image" src="https://github.com/user-attachments/assets/dfb90a52-936d-484d-adb1-f2caf37a13e7" />
+
+<img width="1166" height="134" alt="image" src="https://github.com/user-attachments/assets/c2830c46-711d-45d1-9f5f-0c8d350062d3" />
 
 ---
 
@@ -78,11 +81,12 @@ Infrastructure state is stored securely in S3.
 ---
 
 ## Terraform Apply Output
-[ Add Terraform Apply Screenshot Here ]
+
+<img width="1166" height="607" alt="image" src="https://github.com/user-attachments/assets/77b71573-3887-4781-87ba-ad17b0f736cb" />
 
 ---
 
-### 🔹 Auto Scaling Configuration
+###  Auto Scaling Configuration
 
 - Min: 1
 - Desired: 1
