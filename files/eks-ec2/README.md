@@ -5,20 +5,14 @@
 Jenkins Pipeline  
 ↓  
 Docker Build  
-↓  
-Push Image to Amazon ECR  
-↓  
-Kubernetes Deployment  
-↓  
-EKS Cluster (Managed Node Group - EC2)  
-↓  
-Service (ClusterIP)  
-↓  
-Ingress (AWS Load Balancer Controller)  
-↓  
-Application Load Balancer (ALB)  
-↓  
-Public Internet  
+→ Push to ECR  
+→ EKS Cluster (Managed Node Group)  
+→ AWS Load Balancer Controller  
+→ Kubernetes Deployment  
+→ Service (ClusterIP)  
+→ Ingress (ALB)  
+→ Public Internet  
+
 
 This deployment uses **Amazon EKS with EC2 worker nodes** to run the PetCart frontend application inside Kubernetes.
 
