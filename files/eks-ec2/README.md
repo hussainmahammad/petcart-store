@@ -1,6 +1,6 @@
-# 2️⃣ EKS (EC2 Mode) – Kubernetes with Managed Nodes
+# EKS (EC2 Mode) – Kubernetes with Managed Nodes
 
-## 🔹 Architecture Flow
+## Architecture Flow
 
 Jenkins Pipeline  
 ↓  
