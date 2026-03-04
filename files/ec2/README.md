@@ -116,7 +116,7 @@ CloudWatch alarms trigger scaling policies automatically.
 
 ## EC2 CloudWatch Log Groups
 
-<img width="1116" height="781" alt="image" src="https://github.com/user-attachments/assets/8b155e7b-5588-48ba-bf79-792441ae36f2" />
+<img width="1166" height="205" alt="image" src="https://github.com/user-attachments/assets/adf0f714-a05c-4fed-8d4a-48bd7cf37c44" />
 
 
 ## Access and Error Logs from Logs Console
