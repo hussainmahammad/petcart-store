@@ -1,6 +1,6 @@
-# 🐾 PetCart Store
+# PetCart Store
 
-## 📌 Project Overview
+## Project Overview
 
 PetCart Store is a frontend e-commerce application deployed using **three different infrastructure strategies on AWS**:
 
@@ -22,7 +22,7 @@ This project demonstrates real-world DevOps practices including:
 
 ---
 
-# 🏗 Architecture Overview
+# Architecture Overview
 
 <img width="1536" height="1024" alt="PetCart-Shop" src="https://github.com/user-attachments/assets/ce63a258-4f05-43df-958a-7eb683ff7c14" />
 
