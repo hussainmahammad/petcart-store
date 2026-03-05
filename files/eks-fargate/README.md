@@ -1,12 +1,12 @@
-# 🐾 PetCart Deployment on AWS EKS Fargate
+# PetCart Deployment on AWS EKS Fargate
 
 ## EKS Fargate Architecture Diagram
 
-![EKS Fargate Architecture](ADD_EKS_ARCHITECTURE_IMAGE_HERE)
+<img width="1067" height="769" alt="eks_Fargate" src="https://github.com/user-attachments/assets/fc833f0e-67dc-4393-a1fb-8a45ba0815b9" />
 
 ---
 
-## 📌 How This Deployment Works
+##  How This Deployment Works
 
 This project deploys the **PetCart application on AWS EKS using AWS Fargate**.
 
@@ -16,7 +16,7 @@ AWS automatically manages the infrastructure while **Kubernetes manages the cont
 
 ---
 
-## 🚀 CI/CD Pipeline Flow
+##  CI/CD Pipeline Flow
 
 The application container image is built and pushed to **Amazon ECR** using **Jenkins**.
 
@@ -36,7 +36,7 @@ Jenkins builds the Docker image and stores it in **Amazon ECR**, which is used b
 
 ---
 
-## ⚙️ EKS Cluster Setup
+##  EKS Cluster Setup
 
 The Kubernetes cluster is created using **eksctl**.
 
@@ -57,7 +57,7 @@ These components manage the Kubernetes cluster and schedule pods.
 
 ---
 
-## 🧠 Fargate Profiles
+##  Fargate Profiles
 
 Fargate Profiles define **which pods should run on AWS Fargate**.
 
