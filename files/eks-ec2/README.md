@@ -22,7 +22,7 @@ The **AWS Load Balancer Controller** dynamically provisions an **Application Loa
 
 ## EKS EC2 Architecture Diagram
 
-<img width="1278" height="768" alt="ec2_eks" src="https://github.com/user-attachments/assets/dc25c1a7-5ad2-40fd-812c-82b0be1e5007" />
+<img width="1536" height="919" alt="ChatGPT Image Mar 4, 2026, 01_05_20 PM" src="https://github.com/user-attachments/assets/3bfa74a5-dcb1-4ad3-911d-03f546d5dc1d" />
 
 ---
 
@@ -146,7 +146,7 @@ No manual ALB provisioning is required.
 
 ---
 
-## Created Petcart Clster
+## Created Petcart Cluster
 
 <img width="1166" height="546" alt="image" src="https://github.com/user-attachments/assets/9f1eb676-07d3-4c7c-b100-9172c08b9a59" />
 
@@ -160,7 +160,7 @@ No manual ALB provisioning is required.
 
 ---
 
-## 📸 ALB Created by Ingress
+## ALB Created by Ingress
 
 <img width="1166" height="60" alt="image" src="https://github.com/user-attachments/assets/d83f6c78-0686-4713-ad0c-9d869cf7005b" />
 
