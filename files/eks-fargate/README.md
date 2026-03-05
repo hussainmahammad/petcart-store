@@ -69,7 +69,7 @@ kube-system
 petcart
 ```
 <img width="1166" height="268" alt="image" src="https://github.com/user-attachments/assets/5c57405c-0a29-4415-9b4b-476a8d84a456" />
-```
+
 
 Whenever a pod is created in these namespaces, it automatically runs on **AWS Fargate compute instead of EC2 nodes**.
 
@@ -81,7 +81,7 @@ This removes the need for:
 
 ---
 
-## 📦 Application Deployment
+##  Application Deployment
 
 The PetCart application is deployed using **standard Kubernetes resources**.
 
@@ -118,6 +118,9 @@ This means:
 - No EC2 instances  
 - No server management  
 - Pods run in serverless containers  
+
+---
+<img width="1166" height="499" alt="image" src="https://github.com/user-attachments/assets/4241f667-6fb9-4ce6-b7b8-b29f193f0b2d" />
 
 ---
 
