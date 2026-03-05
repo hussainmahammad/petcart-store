@@ -139,7 +139,7 @@ The service provides:
 
 ---
 
-## 🌐 Application Access using Ingress
+## Application Access using Ingress
 
 The application is exposed to the internet using **Kubernetes Ingress**.
 
@@ -170,11 +170,11 @@ All traffic first passes through the **Application Load Balancer**.
 
 ## ALB Created by Ingress
 
-![ALB Screenshot](ADD_ALB_SCREENSHOT_HERE)
+<img width="1166" height="76" alt="image" src="https://github.com/user-attachments/assets/b8a044f9-7a2b-4717-85c5-9b65ff191113" />
 
 ---
 
-## 📊 Logging
+## Logging
 
 Application logs from the containers are collected using **Amazon CloudWatch Logs**.
 
@@ -194,4 +194,10 @@ This helps monitor application logs and troubleshoot issues.
 
 ## Fargate Logs
 
-![Fargate Logs](ADD_FARGATE_LOGS_SCREENSHOT_HERE)
+<img width="1166" height="222" alt="image" src="https://github.com/user-attachments/assets/82d578a3-a633-4b25-870c-2f3a464e4bac" />
+
+---
+
+<img width="1166" height="708" alt="image" src="https://github.com/user-attachments/assets/bd978832-e59b-4457-9f67-a8c9bec98846" />
+
+---
