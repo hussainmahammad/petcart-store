@@ -171,8 +171,23 @@ This provides visibility into:
 
 ---
 
-## 📸 Container Insights Metrics
+## Container Insights Metrics
 
-![Container Insights](screenshots/container-insights.png)
+<img width="1166" height="494" alt="image" src="https://github.com/user-attachments/assets/a234827e-b52a-4642-b709-d7e05fdbcfeb" />
+
+**CPU and Memory usage of the PetCart deployment pods are retrieved from CloudWatch Container Insights and displayed in the UI.**
+
+<img width="1007" height="415" alt="image" src="https://github.com/user-attachments/assets/d278f549-25c4-4aef-8728-078336b18cf1" />
+
+**Amazon CloudWatch Logs Groups**
+
+<img width="1166" height="301" alt="image" src="https://github.com/user-attachments/assets/0a1102f5-114f-44e9-8941-8ed5c3f06bea" />
+
+**Access and Error logs shown in the UI console are fetched from CloudWatch Log Groups**
+
+<img width="1166" height="728" alt="image" src="https://github.com/user-attachments/assets/29944fbf-a882-41be-8d5d-4f79be1537e9" />
+
+
+
 
 ---
