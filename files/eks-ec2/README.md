@@ -20,13 +20,13 @@ The **AWS Load Balancer Controller** dynamically provisions an **Application Loa
 
 ---
 
-## 📸 EKS EC2 Architecture Diagram
+## EKS EC2 Architecture Diagram
 
 <img width="1278" height="768" alt="ec2_eks" src="https://github.com/user-attachments/assets/dc25c1a7-5ad2-40fd-812c-82b0be1e5007" />
 
 ---
 
-## 🔹 Cluster Creation
+##  Cluster Creation
 
 The Kubernetes cluster is created using **eksctl**.
 
@@ -47,7 +47,7 @@ Benefits of this setup:
 
 ---
 
-## 🔹 Docker & ECR Integration
+##  Docker & ECR Integration
 
 The Jenkins CI pipeline performs the following steps:
 
@@ -70,7 +70,7 @@ Kubernetes Deployment
 
 ---
 
-## 📸 ECR Repository Screenshot
+##  ECR Repository Screenshot
 
 <img width="1543" height="152" alt="image" src="https://github.com/user-attachments/assets/a5d95f93-cbed-49ab-87b7-2cedd1fd4d73" />
 
@@ -146,13 +146,27 @@ No manual ALB provisioning is required.
 
 ---
 
-## 📸 ALB Created by Ingress
+## Created Petcart Clster
 
-![EKS ALB](screenshots/eks-alb.png)
+<img width="1166" height="546" alt="image" src="https://github.com/user-attachments/assets/9f1eb676-07d3-4c7c-b100-9172c08b9a59" />
 
 ---
 
-## 🔹 Observability (EKS EC2)
+<img width="1166" height="364" alt="image" src="https://github.com/user-attachments/assets/1e9abb6b-f910-404d-9f32-ea402326db71" />
+
+---
+
+<img width="1166" height="347" alt="image" src="https://github.com/user-attachments/assets/f211b7c5-5a4c-4e54-bab8-bf559a0b3cf7" />
+
+---
+
+## 📸 ALB Created by Ingress
+
+<img width="1166" height="60" alt="image" src="https://github.com/user-attachments/assets/d83f6c78-0686-4713-ad0c-9d869cf7005b" />
+
+---
+
+##  Observability (EKS EC2)
 
 Monitoring is enabled using **Amazon CloudWatch Container Insights**.
 
@@ -175,19 +189,22 @@ This provides visibility into:
 
 <img width="1166" height="494" alt="image" src="https://github.com/user-attachments/assets/a234827e-b52a-4642-b709-d7e05fdbcfeb" />
 
+---
+
 **CPU and Memory usage of the PetCart deployment pods are retrieved from CloudWatch Container Insights and displayed in the UI.**
 
 <img width="1007" height="415" alt="image" src="https://github.com/user-attachments/assets/d278f549-25c4-4aef-8728-078336b18cf1" />
+
+---
 
 **Amazon CloudWatch Logs Groups**
 
 <img width="1166" height="301" alt="image" src="https://github.com/user-attachments/assets/0a1102f5-114f-44e9-8941-8ed5c3f06bea" />
 
+---
+
 **Access and Error logs shown in the UI console are fetched from CloudWatch Log Groups**
 
 <img width="1166" height="728" alt="image" src="https://github.com/user-attachments/assets/29944fbf-a882-41be-8d5d-4f79be1537e9" />
-
-
-
 
 ---
