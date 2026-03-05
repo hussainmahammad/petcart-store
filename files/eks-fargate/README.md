@@ -1,133 +1,192 @@
-## 📸 EKS Fargate Architecture Diagram
+# 🐾 PetCart Deployment on AWS EKS Fargate
 
-![EKS Fargate Architecture](ADD_EKS_FARGATE_ARCHITECTURE_SCREENSHOT_HERE)
+## EKS Fargate Architecture Diagram
+
+![EKS Fargate Architecture](ADD_EKS_ARCHITECTURE_IMAGE_HERE)
 
 ---
 
-## 🔹 Fargate Profiles
+## 📌 How This Deployment Works
 
-Fargate Profiles determine **which Kubernetes pods should run on Fargate compute**.
+This project deploys the **PetCart application on AWS EKS using AWS Fargate**.
+
+Instead of managing **EC2 worker nodes**, the application pods run on **AWS Fargate**, which is a **serverless compute engine for containers**.
+
+AWS automatically manages the infrastructure while **Kubernetes manages the containers**.
+
+---
+
+## 🚀 CI/CD Pipeline Flow
+
+The application container image is built and pushed to **Amazon ECR** using **Jenkins**.
+
+```
+Jenkins Pipeline
+      ↓
+Docker Build
+      ↓
+Docker Tag
+      ↓
+Docker Push
+      ↓
+Amazon ECR (petcart repository)
+```
+
+Jenkins builds the Docker image and stores it in **Amazon ECR**, which is used by Kubernetes to pull the application image.
+
+---
+
+## ⚙️ EKS Cluster Setup
+
+The Kubernetes cluster is created using **eksctl**.
+
+```bash
+eksctl create cluster
+```
+
+This command creates the **EKS cluster and Fargate profiles**.
+
+The **EKS Control Plane is fully managed by AWS**, which includes:
+
+- Kubernetes API Server  
+- etcd  
+- Scheduler  
+- Controller Manager  
+
+These components manage the Kubernetes cluster and schedule pods.
+
+---
+
+## 🧠 Fargate Profiles
+
+Fargate Profiles define **which pods should run on AWS Fargate**.
 
 Profiles are configured for the following namespaces:
 
-- `default`
-- `kube-system`
-- `petcart`
+```
+default
+kube-system
+petcart
+```
 
-When pods are created in these namespaces, they are automatically scheduled to run on **AWS Fargate compute** instead of EC2 nodes.
+Whenever a pod is created in these namespaces, it automatically runs on **AWS Fargate compute instead of EC2 nodes**.
 
 This removes the need for:
 
-- Node patching  
+- Managing worker nodes  
+- OS patching  
 - Capacity planning  
-- OS management  
-
-Pods start automatically whenever the Kubernetes deployment creates them.
 
 ---
 
-## 🔹 Application Deployment
+## 📦 Application Deployment
 
-The PetCart application is deployed inside the Kubernetes cluster using **standard Kubernetes resources**.
+The PetCart application is deployed using **standard Kubernetes resources**.
 
-### Components Used
+The application runs inside a dedicated namespace.
 
-### Namespace
-
-A dedicated namespace is used to isolate application resources.
-
-```yaml
-namespace: petcart
+```
+Namespace: petcart
 ```
 
-**Benefits**
-
-- Logical separation  
-- Cleaner resource management  
-- Easier monitoring  
+This helps isolate application resources inside the cluster.
 
 ---
 
 ### Deployment
 
-The **Deployment** manages the application pods running on Fargate.
+The **Deployment** creates and manages the application pods.
 
-**Responsibilities**
+Responsibilities:
 
+- Creates pods  
 - Maintains the desired number of pods  
 - Handles rolling updates  
-- Ensures application availability  
 
-The container image used by the deployment is stored in **Amazon ECR**.
+The deployment pulls the container image from **Amazon ECR**.
 
 ---
 
-### Service
+### Pods (Running on Fargate)
 
-A Kubernetes **Service** exposes the application internally inside the cluster.
+When the deployment creates pods, **AWS Fargate automatically provides compute resources**.
 
-**Configuration**
+This means:
+
+- No EC2 instances  
+- No server management  
+- Pods run in serverless containers  
+
+---
+
+### Service (ClusterIP)
+
+The application pods are exposed internally using a Kubernetes **Service**.
 
 ```
 Type: ClusterIP
 ```
 
-**Purpose**
+The service provides:
 
-- Enables communication between Kubernetes components  
-- Provides internal load balancing between pods  
+- Internal communication inside the cluster  
+- Load balancing between pods  
 
 ---
 
-### Ingress (AWS Load Balancer Controller)
+## 🌐 Application Access using Ingress
 
-The application is exposed externally using **Kubernetes Ingress integrated with the AWS Load Balancer Controller**.
+The application is exposed to the internet using **Kubernetes Ingress**.
 
-When the Ingress resource is created, the controller automatically provisions:
+The **AWS Load Balancer Controller** automatically creates an **Application Load Balancer (ALB)**.
 
-- Application Load Balancer (ALB)  
-- Target Groups  
-- Listener Rules  
-- Security Groups  
+---
 
-**Traffic Flow**
+## Traffic Flow
+
+The request path looks like this:
 
 ```
 Internet
    ↓
-Application Load Balancer
+Application Load Balancer (ALB)
    ↓
 Ingress
    ↓
-Service
+Service (ClusterIP)
    ↓
 Pods running on Fargate
 ```
 
----
-
-## 📸 ALB Created by Ingress
-
-![ALB Created by Ingress](ADD_ALB_SCREENSHOT_HERE)
+Pods are **not directly exposed to the internet**.  
+All traffic first passes through the **Application Load Balancer**.
 
 ---
 
-## 🔹 Logging (Fargate)
+## ALB Created by Ingress
 
-Application logs are centralized using **Amazon CloudWatch Logs**.
-
-Logging is configured using the **aws-observability namespace** and **Fargate logging configuration**.
-
-This enables collection of:
-
-- Container logs  
-- Pod logs  
-- Application logs  
-
-All logs are stored in **CloudWatch Log Groups** for monitoring and troubleshooting.
+![ALB Screenshot](ADD_ALB_SCREENSHOT_HERE)
 
 ---
 
-## 📸 Fargate Logs Screenshot
+## 📊 Logging
+
+Application logs from the containers are collected using **Amazon CloudWatch Logs**.
+
+Log flow:
+
+```
+Pods (Fargate)
+     ↓
+CloudWatch Logs
+     ↓
+Amazon CloudWatch
+```
+
+This helps monitor application logs and troubleshoot issues.
+
+---
+
+## Fargate Logs
 
 ![Fargate Logs](ADD_FARGATE_LOGS_SCREENSHOT_HERE)
