@@ -68,6 +68,8 @@ default
 kube-system
 petcart
 ```
+<img width="1166" height="268" alt="image" src="https://github.com/user-attachments/assets/5c57405c-0a29-4415-9b4b-476a8d84a456" />
+```
 
 Whenever a pod is created in these namespaces, it automatically runs on **AWS Fargate compute instead of EC2 nodes**.
 
