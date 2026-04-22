@@ -233,10 +233,23 @@ pipeline {
                credentialsId: 'account-c-aws']
             ]) {
               sh '''
-                kubectl apply -f files/eks-fargate/k8s/namespace.yaml
-                kubectl apply -f files/eks-fargate/k8s/deployment.yaml
-                kubectl apply -f files/eks-fargate/k8s/service.yaml
-                kubectl apply -f files/eks-fargate/k8s/ingress.yaml
+			  
+				set -e
+				
+				TARGET_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+				
+				IMAGE_URI="$TARGET_ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
+				
+				echo "Using image: $IMAGE_URI"
+				
+				kubectl apply -f files/eks-fargate/k8s/namespace.yaml
+				
+				export IMAGE_URI
+				envsubst < files/eks-fargate/k8s/deployment.yaml | kubectl apply -f -
+				
+				kubectl apply -f files/eks-fargate/k8s/service.yaml
+				kubectl apply -f files/eks-fargate/k8s/ingress.yaml
+				
               '''
             }
           }
@@ -248,10 +261,21 @@ pipeline {
                credentialsId: 'account-c-aws']
             ]) {
               sh '''
-                kubectl apply -f files/eks-ec2/k8s/namespace.yaml
-                kubectl apply -f files/eks-ec2/k8s/deployment.yaml
-                kubectl apply -f files/eks-ec2/k8s/service.yaml
-                kubectl apply -f files/eks-ec2/k8s/ingress.yaml
+				set -e
+				
+				TARGET_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+				IMAGE_URI="$TARGET_ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
+				
+				echo "Using image: $IMAGE_URI"
+				kubectl apply -f files/eks-ec2/k8s/namespace.yaml
+				
+				export IMAGE_URI
+				
+				envsubst < files/eks-ec2/k8s/deployment.yaml | kubectl apply -f -
+				
+				kubectl apply -f files/eks-ec2/k8s/service.yaml
+				kubectl apply -f files/eks-ec2/k8s/ingress.yaml
+                
               '''
             }
           }
