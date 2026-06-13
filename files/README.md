@@ -6,7 +6,7 @@ PetCart Store is a frontend e-commerce application deployed using **three differ
 
 1. **EC2 + Auto Scaling + ALB** (Traditional Infrastructure)
 2. **EKS with EC2 Worker Nodes** (Managed Kubernetes)
-3. **EKS with Fargate** (Serverless Kubernetes)
+3. **EKS with Fargate** (Serverless Kubernetes).
 
 This project demonstrates real-world DevOps practices including:
 
