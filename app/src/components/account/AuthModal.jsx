@@ -155,7 +155,7 @@ export default function AuthModal({ onClose, onLoginSuccess, defaultTab = "login
 
     if (!valid) return;
 
-    if (formData.email === "test@petcartshop.com" && formData.password === "PetCart.Shop") {
+    if (formData.email === "admin@petcart.com" && formData.password === "admin") {
       onLoginSuccess();
     } else {
       setGlobalError("Invalid email or password");
